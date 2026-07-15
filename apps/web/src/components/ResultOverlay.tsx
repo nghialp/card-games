@@ -29,7 +29,7 @@ export function ResultOverlay({ result, room, onPlayAgain, onClose }: Props) {
                 }
               >
                 {result.coinDelta[userId] >= 0 ? '+' : ''}
-                {result.coinDelta[userId]} 🪙
+                {result.coinDelta[userId]} 🍠
               </span>
             </li>
           ))}

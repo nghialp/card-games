@@ -9,8 +9,20 @@ import { Chat } from '../components/Chat';
 import { ResultOverlay } from '../components/ResultOverlay';
 import { getUserId } from '../lib/socket';
 import { initAudio, isMuted, setMuted } from '../lib/sound';
+import { useAuth } from '../store/auth';
 
 const POSITIONS = ['left', 'top', 'right'] as const;
+
+function BalanceChip() {
+  const user = useAuth((s) => s.user);
+  const balance = useAuth((s) => s.balance);
+  if (!user) return null;
+  return (
+    <span className="balance balance--chip">
+      🍠 {balance.toLocaleString('vi-VN')}
+    </span>
+  );
+}
 
 function MuteButton() {
   const [muted, set] = useState(isMuted());
@@ -80,9 +92,10 @@ export function Room() {
       <header className="room__header">
         <span>
           Phòng <strong>{room.id}</strong>
-          {room.betAmount > 0 && <> · cược {room.betAmount} 🪙</>}
+          {room.betAmount > 0 && <> · cược {room.betAmount} 🍠</>}
         </span>
         <div className="room__header-actions">
+          <BalanceChip />
           <MuteButton />
           <button className="btn btn--ghost" onClick={() => void leave()}>
             Rời phòng

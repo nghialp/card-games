@@ -74,7 +74,7 @@ Kiểm tra server sống: `curl http://localhost:3000/health` → `{"status":"ok
 | `CORS_ORIGIN` | `*` | Đặt thành origin web client ở production |
 | `DATABASE_URL` | — | Postgres; thiếu → không lưu trận/ví (chỉ nên khi dev) |
 | `REDIS_URL` | — | Redis; thiếu → mất room state khi restart, không scale ngang được |
-| `JWT_SECRET` | — | Bắt buộc đổi ở production |
+| `JWT_SECRET` | `dev-secret` | Ký JWT cho đăng nhập — bắt buộc đổi ở production |
 | `TURN_TIMEOUT_MS` | `20000` | Thời gian mỗi lượt đánh |
 
 ### Redis & PostgreSQL làm gì
@@ -164,6 +164,21 @@ Chi tiết:
 - Postgres/Redis **không expose cổng ra host** — chỉ nội bộ docker network.
 - Deploy VPS thật: copy repo lên máy, chạy đúng lệnh trên, rồi trỏ
   Cloudflare/Caddy/nginx ngoài vào cổng 8080 để có HTTPS.
+
+## 4b. API xác thực
+
+`/auth/*` do nginx proxy sẵn (dev đi qua vite proxy). Tài khoản mới được tặng
+1.000 củ 🍠. Guest/bot vẫn chơi được không cần tài khoản (không lưu số dư).
+
+| Endpoint | Body | Trả về |
+|---|---|---|
+| `POST /auth/register` | `{email, password, displayName}` | `{user, balance, accessToken, refreshToken}` |
+| `POST /auth/login` | `{email, password}` | như trên |
+| `POST /auth/refresh` | `{refreshToken}` | như trên (refresh token dùng một lần — rotate) |
+| `GET /auth/me` | header `Authorization: Bearer <access>` | `{user, balance}` |
+
+Socket handshake: đăng nhập gửi `auth: {token}` (server lấy userId từ JWT);
+khách gửi `auth: {userId, displayName}` như cũ.
 
 ## 5. Observability
 

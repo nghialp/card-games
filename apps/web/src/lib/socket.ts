@@ -13,8 +13,8 @@ export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
  */
 const SERVER_URL = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? '';
 
-/** userId bền qua reload để server reattach đúng ghế khi reconnect */
-export function getUserId(): string {
+/** userId khách bền qua reload để server reattach đúng ghế khi reconnect */
+function guestId(): string {
   let id = localStorage.getItem('cg:userId');
   if (!id) {
     id = crypto.randomUUID();
@@ -24,15 +24,34 @@ export function getUserId(): string {
 }
 
 let socket: GameSocket | null = null;
+let activeUserId: string | null = null;
 
-export function connectSocket(displayName: string): GameSocket {
+/** id trong phiên chơi hiện tại: account id nếu đăng nhập, không thì guest id */
+export function getUserId(): string {
+  return activeUserId ?? guestId();
+}
+
+export interface SocketSession {
+  token: string;
+  userId: string;
+}
+
+export function connectSocket(displayName: string, session?: SocketSession): GameSocket {
   if (socket) return socket;
-  const opts = {
-    auth: { userId: getUserId(), displayName },
-    transports: ['websocket' as const],
-  };
+  activeUserId = session?.userId ?? null;
+  const auth = session
+    ? { token: session.token }
+    : { userId: guestId(), displayName };
+  const opts = { auth, transports: ['websocket' as const] };
   socket = SERVER_URL ? io(SERVER_URL, opts) : io(opts);
   return socket;
+}
+
+/** Gọi khi đăng nhập/đăng xuất — phiên socket kế tiếp sẽ dùng danh tính mới */
+export function resetSocket(): void {
+  socket?.disconnect();
+  socket = null;
+  activeUserId = null;
 }
 
 export function getSocket(): GameSocket {

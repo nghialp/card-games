@@ -11,6 +11,7 @@ import {
 } from '@nestjs/websockets';
 import { randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
+import { verifyAccessToken } from '@shared-libs/auth';
 import { MatchError } from '@card-games/game-tienlen';
 import type {
   Card,
@@ -27,10 +28,13 @@ type AckResponse<T = undefined> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
+const JWT_SECRET = process.env.JWT_SECRET ?? 'dev-secret';
+
 /**
- * Auth tạm thời kiểu guest: client gửi { userId?, displayName } trong
- * handshake auth; giữ userId ở localStorage để reconnect về đúng ghế.
- * TODO(P1.5): thay bằng JWT từ @shared-libs/auth.
+ * Handshake auth hai chế độ:
+ * - Tài khoản: { token } — JWT từ /auth/login, server lấy userId từ token
+ *   (client không tự khai được id người khác).
+ * - Khách/bot: { userId?, displayName? } — giữ id ở localStorage để reconnect.
  */
 @WebSocketGateway({ cors: { origin: process.env.CORS_ORIGIN ?? '*' } })
 export class GameGateway
@@ -49,13 +53,26 @@ export class GameGateway
 
   handleConnection(client: GameSocket): void {
     const auth = client.handshake.auth as {
+      token?: string;
       userId?: string;
       displayName?: string;
     };
-    const user: SessionUser = {
-      userId: auth.userId ?? randomUUID(),
-      displayName: auth.displayName ?? 'Người chơi',
-    };
+    let user: SessionUser | null = null;
+    if (auth.token) {
+      try {
+        const payload = verifyAccessToken(auth.token, JWT_SECRET);
+        user = { userId: payload.sub, displayName: payload.name || 'Người chơi' };
+      } catch {
+        // token hỏng/hết hạn → chơi tiếp như khách, client sẽ tự refresh sau
+        this.logger.warn(`socket ${client.id}: invalid token, falling back to guest`);
+      }
+    }
+    if (!user) {
+      user = {
+        userId: auth.userId ?? randomUUID(),
+        displayName: auth.displayName ?? 'Người chơi',
+      };
+    }
     client.data.user = user;
 
     // Reconnect về phòng cũ nếu còn ván đang chơi

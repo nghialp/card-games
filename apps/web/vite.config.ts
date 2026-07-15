@@ -6,10 +6,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      // dev same-origin: /socket.io → server local (đổi target qua VITE_PROXY_TARGET)
+      // dev same-origin: /socket.io + /auth → server local (đổi target qua VITE_PROXY_TARGET)
       '/socket.io': {
         target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:3000',
         ws: true,
+      },
+      '/auth': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:3000',
       },
     },
   },

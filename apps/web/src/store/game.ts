@@ -7,8 +7,14 @@ import {
   type Combo,
 } from '@card-games/game-tienlen';
 import type { Card, ChatMessage, MatchResult, RoomState } from '@card-games/types';
-import { connectSocket, emitAck, getUserId } from '../lib/socket';
+import {
+  connectSocket,
+  emitAck,
+  getUserId,
+  type SocketSession,
+} from '../lib/socket';
 import { initAudio, sounds } from '../lib/sound';
+import { useAuth } from './auth';
 
 interface GameStore {
   displayName: string;
@@ -29,7 +35,7 @@ interface GameStore {
   chat: ChatMessage[];
   error: string | null;
 
-  connect: (displayName: string) => void;
+  connect: (displayName: string, session?: SocketSession) => void;
   quickJoin: (betAmount: number) => Promise<void>;
   leave: () => Promise<void>;
   setReady: (ready: boolean) => Promise<void>;
@@ -45,6 +51,8 @@ const sameCard = (a: Card, b: Card): boolean =>
   a.rank === b.rank && a.suit === b.suit;
 
 let seq = 0;
+/** Socket đã gắn handler — tránh đăng ký trùng khi connect() gọi lại */
+let wiredSocket: unknown = null;
 
 export const useGame = create<GameStore>((set, get) => {
   const guard = async (fn: () => Promise<void>): Promise<void> => {
@@ -72,11 +80,13 @@ export const useGame = create<GameStore>((set, get) => {
     chat: [],
     error: null,
 
-    connect(displayName) {
+    connect(displayName, session) {
       localStorage.setItem('cg:displayName', displayName);
       initAudio();
-      const socket = connectSocket(displayName);
+      const socket = connectSocket(displayName, session);
       set({ displayName });
+      if (wiredSocket === socket) return;
+      wiredSocket = socket;
 
       socket.on('connect', () => set({ connected: true }));
       socket.on('disconnect', () => set({ connected: false }));
@@ -150,6 +160,8 @@ export const useGame = create<GameStore>((set, get) => {
       socket.on('game:ended', (result) => {
         if (result.ranking[0] === getUserId()) sounds.win();
         else sounds.lose();
+        const delta = result.coinDelta[getUserId()];
+        if (delta !== undefined) useAuth.getState().applyDelta(delta);
         set({ result });
       });
 
