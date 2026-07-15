@@ -1,0 +1,31 @@
+export type GameType = 'tienlen';
+
+export type RoomStatus = 'waiting' | 'playing' | 'finished';
+
+export interface RoomPlayer {
+  userId: string;
+  displayName: string;
+  avatar?: string;
+  seat: number;
+  ready: boolean;
+  /** Số lá còn trên tay — chỉ có khi đang trong ván */
+  cardsLeft?: number;
+  connected: boolean;
+}
+
+export interface RoomState {
+  id: string;
+  gameType: GameType;
+  status: RoomStatus;
+  hostId: string;
+  betAmount: number;
+  maxPlayers: number;
+  players: RoomPlayer[];
+}
+
+export interface MatchResult {
+  matchId: string;
+  /** userId theo thứ hạng, phần tử 0 là người thắng */
+  ranking: string[];
+  coinDelta: Record<string, number>;
+}

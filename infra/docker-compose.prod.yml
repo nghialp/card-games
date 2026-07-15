@@ -1,0 +1,70 @@
+# Stack production tự chứa — build từ root repo:
+#   docker compose -f infra/docker-compose.prod.yml up -d --build
+# Web (kèm proxy socket) ở cổng 8080. Postgres/Redis chỉ nội bộ, không expose.
+name: card-games-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cardgames
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cardgames}
+      POSTGRES_DB: cardgames
+    volumes:
+      - prod-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cardgames']
+      interval: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - prod-redis-data:/data
+
+  # One-shot: áp migration rồi thoát (prisma CLI có sẵn trong runtime image)
+  migrate:
+    image: card-games-server:local
+    command: ['prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://cardgames:${POSTGRES_PASSWORD:-cardgames}@postgres:5432/cardgames
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  server:
+    image: card-games-server:local
+    build:
+      context: ..
+      dockerfile: apps/server/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: postgresql://cardgames:${POSTGRES_PASSWORD:-cardgames}@postgres:5432/cardgames
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-prod}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    image: card-games-web:local
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '8080:80'
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  prod-postgres-data:
+  prod-redis-data:

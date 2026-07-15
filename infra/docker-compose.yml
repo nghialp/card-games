@@ -1,0 +1,28 @@
+# Hạ tầng dev (Postgres :5433 + Redis :6380) — tên project riêng
+# để không đụng stack production (docker-compose.prod.yml) trên cùng máy
+name: card-games-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cardgames
+      POSTGRES_PASSWORD: cardgames
+      POSTGRES_DB: cardgames
+    ports:
+      # 5433 để không đụng Postgres của project khác trên máy dev
+      - '5433:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      # 6380 để không đụng Redis của project khác trên máy dev
+      - '6380:6379'
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  redis-data:

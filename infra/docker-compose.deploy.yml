@@ -1,0 +1,71 @@
+# Compose cho VPS production — chạy bằng image kéo từ GHCR, KHÔNG build tại chỗ.
+# CI/CD (.github/workflows/deploy.yml) build + push image rồi SSH vào VPS chạy:
+#   docker compose pull && docker compose up -d
+#
+# Setup một lần trên VPS: xem docs/deploy.md mục "CI/CD tự động deploy".
+# File .env đặt cạnh file này trên VPS:
+#   SERVER_IMAGE=ghcr.io/<owner>/card-games-server:latest
+#   WEB_IMAGE=ghcr.io/<owner>/card-games-web:latest
+#   POSTGRES_PASSWORD=...   JWT_SECRET=...   (tùy chọn: SENTRY_DSN, WEB_PORT)
+name: card-games
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cardgames
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?bắt buộc đặt trong .env}
+      POSTGRES_DB: cardgames
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cardgames']
+      interval: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  migrate:
+    image: ${SERVER_IMAGE:?bắt buộc đặt trong .env}
+    command: ['prisma', 'migrate', 'deploy']
+    environment:
+      DATABASE_URL: postgresql://cardgames:${POSTGRES_PASSWORD}@postgres:5432/cardgames
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  server:
+    image: ${SERVER_IMAGE}
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      DATABASE_URL: postgresql://cardgames:${POSTGRES_PASSWORD}@postgres:5432/cardgames
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?bắt buộc đặt trong .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    image: ${WEB_IMAGE:?bắt buộc đặt trong .env}
+    ports:
+      - '${WEB_PORT:-8080}:80'
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

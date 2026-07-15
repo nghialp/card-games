@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Biên dịch mã TypeScript sang JavaScript chuẩn ES2020 (hỗ trợ optional chaining, nullish coalescing, v.v.)
+    "module": "ESNext", // Sử dụng hệ thống module hiện đại (ES Modules), phù hợp với bundler như tsup, webpack, vite
+    "declaration": true, // Tạo file .d.ts (declaration) để hỗ trợ type cho các thư viện khi import từ nơi khác
+    "outDir": "dist", // Thư mục chứa mã đã biên dịch (JS, d.ts, map) là dist/
+    "strict": true, // Bật tất cả các kiểm tra nghiêm ngặt của TypeScript (giúp code an toàn hơn)
+    "esModuleInterop": true, // Cho phép import các module CommonJS như import express from 'express' thay vì import * as express
+    "skipLibCheck": true, // Bỏ qua kiểm tra type trong các thư viện node_modules để tăng tốc độ build
+    "moduleResolution": "node", // Dùng cách resolve module giống Node.js (tìm file theo đường dẫn, index.ts, v.v.)
+    "resolveJsonModule": true, // Cho phép import file .json như import config from './config.json'
+    "isolatedModules": true // Đảm bảo mỗi file .ts có thể được biên dịch độc lập (bắt buộc nếu dùng tsup, vite, hoặc babel)
+  }
+}

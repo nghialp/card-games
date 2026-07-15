@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id
+  displayName  String        @map("display_name")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  wallet       Wallet?
+  matchPlayers MatchPlayer[]
+  transactions Transaction[]
+
+  @@map("users")
+}
+
+model Wallet {
+  userId    String   @id @map("user_id")
+  balance   Int
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("wallets")
+}
+
+/// Append-only: mọi thay đổi số dư đều đi qua đây để đối soát
+model Transaction {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  amount    Int
+  type      String
+  refId     String?  @map("ref_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@map("transactions")
+}
+
+model Match {
+  id        String        @id
+  gameType  String        @map("game_type")
+  betAmount Int           @map("bet_amount")
+  startedAt DateTime      @map("started_at")
+  endedAt   DateTime      @default(now()) @map("ended_at")
+  players   MatchPlayer[]
+
+  @@map("matches")
+}
+
+model MatchPlayer {
+  matchId   String @map("match_id")
+  userId    String @map("user_id")
+  rank      Int
+  coinDelta Int    @map("coin_delta")
+  match     Match  @relation(fields: [matchId], references: [id])
+  user      User   @relation(fields: [userId], references: [id])
+
+  @@id([matchId, userId])
+  @@index([userId])
+  @@map("match_players")
+}
