@@ -6,14 +6,31 @@ import { GameGateway } from './game/game.gateway';
 import { RoomService } from './game/room.service';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsService } from './metrics/metrics.service';
+import { RewardsController } from './shop/rewards.controller';
+import { RewardsService } from './shop/rewards.service';
+import { ShopController } from './shop/shop.controller';
+import { ShopService } from './shop/shop.service';
+import { LeaderboardController, UsersController } from './users/users.controller';
+import { UsersService } from './users/users.service';
 import { MatchPersistenceService } from './persistence/match-persistence.service';
 import { PrismaService } from './persistence/prisma.service';
 import { RedisService } from './persistence/redis.service';
 
 @Module({
-  controllers: [HealthController, MetricsController, AuthController],
+  controllers: [
+    HealthController,
+    MetricsController,
+    AuthController,
+    UsersController,
+    LeaderboardController,
+    ShopController,
+    RewardsController,
+  ],
   providers: [
     AuthService,
+    UsersService,
+    ShopService,
+    RewardsService,
     GameGateway,
     RoomService,
     RedisService,

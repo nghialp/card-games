@@ -28,4 +28,10 @@ export interface MatchResult {
   /** userId theo thứ hạng, phần tử 0 là người thắng */
   ranking: string[];
   coinDelta: Record<string, number>;
+  /** Có mặt khi ván kết thúc ngay sau chia bài do tới trắng */
+  instantWin?: {
+    userId: string;
+    /** InstantWinType từ game-tienlen: four-pigs | dragon-straight | four-pair-seq | six-pairs */
+    type: string;
+  };
 }

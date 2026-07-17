@@ -43,7 +43,17 @@ export const ERROR_LABELS: Record<string, string> = {
   INVALID_CREDENTIALS: 'Sai email hoặc mật khẩu',
   INVALID_REFRESH_TOKEN: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại',
   AUTH_REQUIRES_DATABASE: 'Server chưa bật database — không dùng được tài khoản',
+  REQUIRES_DATABASE: 'Server chưa bật database',
   REQUEST_FAILED: 'Có lỗi xảy ra, thử lại sau',
+  // lỗi từ socket (phòng chơi)
+  INSUFFICIENT_BALANCE: 'Không đủ củ 🍠 để vào phòng cược này',
+  ROOM_NOT_FOUND: 'Phòng không tồn tại',
+  ROOM_FULL: 'Phòng đã đầy',
+  ALREADY_PLAYING: 'Phòng đang trong ván',
+  IN_ANOTHER_ROOM: 'Bạn đang ở ván khác chưa kết thúc',
+  NOT_YOUR_TURN: 'Chưa tới lượt bạn',
+  INVALID_PLAY: 'Nước đi không hợp lệ',
+  CANNOT_PASS_WHEN_LEADING: 'Đang cầm cái — phải đánh',
 };
 
 export const errorLabel = (err: unknown): string => {

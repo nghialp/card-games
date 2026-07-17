@@ -18,8 +18,38 @@ model User {
   matchPlayers  MatchPlayer[]
   transactions  Transaction[]
   refreshTokens RefreshToken[]
+  coinOrders    CoinOrder[]
+  dailyCheckins DailyCheckin[]
 
   @@map("users")
+}
+
+model CoinOrder {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  packageId   String    @map("package_id")
+  coins       Int
+  priceVnd    Int       @map("price_vnd")
+  provider    String
+  status      String    @default("pending") // pending | paid | failed
+  providerRef String?   @map("provider_ref")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  paidAt      DateTime? @map("paid_at")
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("coin_orders")
+}
+
+model DailyCheckin {
+  userId String   @map("user_id")
+  day    DateTime @map("day") @db.Date
+  streak Int
+  reward Int
+  user   User     @relation(fields: [userId], references: [id])
+
+  @@id([userId, day])
+  @@map("daily_checkins")
 }
 
 model RefreshToken {

@@ -14,6 +14,18 @@ export default defineConfig({
       '/auth': {
         target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:3000',
       },
+      '/users': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:3000',
+      },
+      '/leaderboard': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:3000',
+      },
+      '/shop': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:3000',
+      },
+      '/rewards': {
+        target: process.env.VITE_PROXY_TARGET ?? 'http://localhost:3000',
+      },
     },
   },
 })

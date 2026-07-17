@@ -76,6 +76,29 @@ Kiểm tra server sống: `curl http://localhost:3000/health` → `{"status":"ok
 | `REDIS_URL` | — | Redis; thiếu → mất room state khi restart, không scale ngang được |
 | `JWT_SECRET` | `dev-secret` | Ký JWT cho đăng nhập — bắt buộc đổi ở production |
 | `TURN_TIMEOUT_MS` | `20000` | Thời gian mỗi lượt đánh |
+| `APP_URL` | `http://localhost:5173` | Origin web — dùng làm returnUrl/notifyUrl khi tạo đơn nạp |
+| `ALLOW_DEV_TOPUP` | (bật nếu ≠ production) | `1` để cho phép cổng "nạp thử" tức thì — **tắt ở production** |
+| `STRIPE_SECRET_KEY` | — | Bật cổng Stripe Checkout |
+| `STRIPE_WEBHOOK_SECRET` | — | Verify chữ ký webhook Stripe |
+| `MOMO_PARTNER_CODE` / `MOMO_ACCESS_KEY` / `MOMO_SECRET_KEY` | — | Bật cổng MoMo (cần đủ cả 3) |
+| `MOMO_ENDPOINT` | `https://test-payment.momo.vn` | Đổi sang `https://payment.momo.vn` khi lên production |
+
+> **Nạp củ:** thiếu key của cổng nào thì cổng đó trả `PROVIDER_NOT_CONFIGURED`.
+> Cổng `dev` (nạp thử tức thì) chỉ để test — production phải đặt `ALLOW_DEV_TOPUP=0`.
+> Stripe/MoMo trong `@shared-libs/payment` đã dựng đúng flow (Checkout + IPN,
+> verify HMAC) nhưng **chưa chạy với tài khoản merchant thật** — cần credentials
+> sandbox để kiểm chứng trước khi bật ở production.
+
+### API mới (auth bằng Bearer token trừ khi ghi công khai)
+
+| Endpoint | Mô tả |
+|---|---|
+| `GET /shop/packages` | Danh sách gói củ (công khai) |
+| `POST /shop/orders` | Tạo đơn nạp `{packageId, provider}` — provider: `dev`\|`stripe`\|`momo` |
+| `POST /shop/webhooks/{stripe,momo}` | Webhook/IPN cổng thanh toán gọi về |
+| `GET /rewards/status` | Trạng thái điểm danh + quảng cáo hôm nay |
+| `POST /rewards/checkin` | Điểm danh (streak thưởng tăng dần, 1 lần/ngày) |
+| `POST /rewards/ad` | Nhận thưởng xem quảng cáo (tối đa 5 lần/ngày) |
 
 ### Redis & PostgreSQL làm gì
 
@@ -179,6 +202,16 @@ Chi tiết:
 
 Socket handshake: đăng nhập gửi `auth: {token}` (server lấy userId từ JWT);
 khách gửi `auth: {userId, displayName}` như cũ.
+
+Endpoint khác (nginx proxy sẵn `/users` + `/leaderboard`):
+
+| Endpoint | Ghi chú |
+|---|---|
+| `GET /users/me/profile` (Bearer) | Hồ sơ: user, số dư, stats thắng/thua, 20 trận gần nhất |
+| `GET /leaderboard/weekly` | Công khai — top 10 tuần (từ 00:00 thứ Hai), tổng củ thắng/thua |
+
+Phòng cược: tài khoản có ví phải **đủ củ theo mức cược** mới vào được
+(`INSUFFICIENT_BALANCE`); guest chưa có ví được chơi thử tự do.
 
 ## 5. Observability
 

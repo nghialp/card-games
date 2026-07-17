@@ -12,6 +12,7 @@
     "@card-games/game-tienlen": "workspace:*",
     "@card-games/types": "workspace:*",
     "@shared-libs/auth": "workspace:*",
+    "@shared-libs/payment": "workspace:*",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
     "prisma": "^6.16.0",
     "socket.io-client": "^4.8.0",

@@ -25,6 +25,16 @@ export class MatchPersistenceService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Số dư ví, null nếu user chưa có ví (guest mới) hoặc không có DB.
+   * null = "không xác định" — caller quyết định cho qua (guest chơi thử).
+   */
+  async getBalance(userId: string): Promise<number | null> {
+    if (!this.prisma.enabled) return null;
+    const wallet = await this.prisma.wallet.findUnique({ where: { userId } });
+    return wallet?.balance ?? null;
+  }
+
+  /**
    * Ghi kết quả trận + cập nhật ví trong một transaction:
    * upsert user, cộng/trừ ví, ghi transaction đối soát, lưu match.
    */

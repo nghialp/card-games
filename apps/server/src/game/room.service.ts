@@ -2,10 +2,14 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { randomInt, randomUUID } from 'node:crypto';
 import type { Server } from 'socket.io';
 import {
+  checkInstantWin,
   createDeck,
   deal,
+  INSTANT_WIN_PRIORITY,
+  pigPenalty,
   shuffle,
   TienLenMatch,
+  type InstantWinType,
   type MatchSnapshot,
 } from '@card-games/game-tienlen';
 import type { Card, MatchResult, RoomState } from '@card-games/types';
@@ -111,7 +115,11 @@ export class RoomService implements OnModuleInit {
     return room ? this.toRoomState(room) : null;
   }
 
-  quickJoin(user: SessionUser, betAmount: number, socketId: string): RoomState {
+  async quickJoin(
+    user: SessionUser,
+    betAmount: number,
+    socketId: string,
+  ): Promise<RoomState> {
     // Mỗi user chỉ ở một phòng: đang giữa ván thì quay về phòng cũ,
     // đang ở phòng chờ khác thì rời trước
     const existing = this.roomOfUser(user.userId);
@@ -122,6 +130,7 @@ export class RoomService implements OnModuleInit {
       }
       this.leaveRoom(user.userId);
     }
+    await this.assertBalance(user.userId, betAmount);
 
     let room = [...this.rooms.values()].find(
       (r) =>
@@ -148,7 +157,11 @@ export class RoomService implements OnModuleInit {
     return this.toRoomState(room);
   }
 
-  joinRoom(user: SessionUser, roomId: string, socketId: string): RoomState {
+  async joinRoom(
+    user: SessionUser,
+    roomId: string,
+    socketId: string,
+  ): Promise<RoomState> {
     const room = this.rooms.get(roomId);
     if (!room) throw new RoomError('ROOM_NOT_FOUND');
     const existing = this.roomOfUser(user.userId);
@@ -156,8 +169,23 @@ export class RoomService implements OnModuleInit {
       if (existing.status === 'playing') throw new RoomError('IN_ANOTHER_ROOM');
       this.leaveRoom(user.userId);
     }
+    if (existing?.id !== roomId) {
+      await this.assertBalance(user.userId, room.betAmount);
+    }
     this.addPlayer(room, user, socketId);
     return this.toRoomState(room);
+  }
+
+  /**
+   * Phòng cược: tài khoản có ví phải đủ củ mới được vào.
+   * Ví null (guest chưa từng chơi / không có DB) thì cho qua — chơi thử.
+   */
+  private async assertBalance(userId: string, betAmount: number): Promise<void> {
+    if (betAmount <= 0) return;
+    const balance = await this.persistence.getBalance(userId);
+    if (balance !== null && balance < betAmount) {
+      throw new RoomError('INSUFFICIENT_BALANCE');
+    }
   }
 
   /** Reconnect: gắn lại socket mới, gửi snapshot riêng cho người đó */
@@ -301,28 +329,73 @@ export class RoomService implements OnModuleInit {
       });
     }
     this.broadcastRoomState(room);
+    this.logger.log(`match ${room.matchId} started in room ${room.id}`);
+
+    // Tới trắng: bài chia xong đã định thắng thua, kết ván luôn
+    const instants = room.players
+      .map((p) => ({ seat: p.seat, type: checkInstantWin(room.match!.handOf(p.seat)) }))
+      .filter((x): x is { seat: number; type: InstantWinType } => x.type !== null)
+      .sort(
+        (a, b) =>
+          INSTANT_WIN_PRIORITY.indexOf(a.type) - INSTANT_WIN_PRIORITY.indexOf(b.type),
+      );
+    if (instants.length > 0) {
+      const winner = instants[0];
+      const others = room.players
+        .filter((p) => p.seat !== winner.seat)
+        .map((p) => p.seat);
+      this.logger.log(
+        `match ${room.matchId}: instant win (${winner.type}) at seat ${winner.seat}`,
+      );
+      this.settleMatch(room, [winner.seat, ...others], winner);
+      return;
+    }
+
     this.emitTurn(room, true);
     this.persist(room);
-    this.logger.log(`match ${room.matchId} started in room ${room.id}`);
   }
 
   private finishMatch(room: Room): void {
     const match = this.requireMatch(room);
-    const ranking = match.publicState().ranking;
-    const bySeat = new Map(room.players.map((p) => [p.seat, p]));
-    const rankedPlayers = ranking.map((seat) => bySeat.get(seat)!);
+    this.settleMatch(room, match.publicState().ranking);
+  }
 
-    // MVP: người thắng ăn tiền cược của tất cả người thua
+  private settleMatch(
+    room: Room,
+    rankingSeats: number[],
+    instantWin?: { seat: number; type: InstantWinType },
+  ): void {
+    const match = this.requireMatch(room);
+    const bySeat = new Map(room.players.map((p) => [p.seat, p]));
+    const rankedPlayers = rankingSeats.map((seat) => bySeat.get(seat)!);
+
+    // Cơ bản: người thắng ăn tiền cược của tất cả người thua
     const coinDelta: Record<string, number> = {};
     rankedPlayers.forEach((p, i) => {
       coinDelta[p.userId] =
         i === 0 ? room.betAmount * (rankedPlayers.length - 1) : -room.betAmount;
     });
 
+    // Thối heo: còn heo trên tay khi kết ván thì đền thêm cho người thắng
+    // (không áp khi tới trắng — ván chưa đánh lá nào)
+    if (!instantWin && room.betAmount > 0) {
+      const winner = rankedPlayers[0];
+      for (const p of rankedPlayers.slice(1)) {
+        const penalty = pigPenalty(match.handOf(p.seat), room.betAmount);
+        if (penalty > 0) {
+          coinDelta[p.userId] -= penalty;
+          coinDelta[winner.userId] += penalty;
+        }
+      }
+    }
+
     const result: MatchResult = {
       matchId: room.matchId!,
       ranking: rankedPlayers.map((p) => p.userId),
       coinDelta,
+      instantWin: instantWin
+        ? { userId: bySeat.get(instantWin.seat)!.userId, type: instantWin.type }
+        : undefined,
     };
     this.clearTimer(room);
     this.server?.to(room.id).emit('game:ended', result);

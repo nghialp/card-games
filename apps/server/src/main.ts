@@ -12,7 +12,8 @@ async function bootstrap(): Promise<void> {
     });
   }
 
-  const app = await NestFactory.create(AppModule);
+  // rawBody: verify chữ ký webhook Stripe cần body gốc chưa parse
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.enableCors({ origin: process.env.CORS_ORIGIN ?? '*' });
   app.enableShutdownHooks(); // đóng Redis/Prisma sạch sẽ khi SIGTERM (docker stop)
 

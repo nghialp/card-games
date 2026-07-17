@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { RewardsBar } from '../components/RewardsBar';
 import { useGame } from '../store/game';
 import { getAccessToken, useAuth } from '../store/auth';
 
@@ -7,9 +8,12 @@ const BETS = [0, 10, 50, 100];
 interface Props {
   onLogin: () => void;
   onRegister: () => void;
+  onProfile: () => void;
+  onLeaderboard: () => void;
+  onShop: () => void;
 }
 
-export function Home({ onLogin, onRegister }: Props) {
+export function Home({ onLogin, onRegister, onProfile, onLeaderboard, onShop }: Props) {
   const displayName = useGame((s) => s.displayName);
   const connected = useGame((s) => s.connected);
   const connect = useGame((s) => s.connect);
@@ -50,6 +54,9 @@ export function Home({ onLogin, onRegister }: Props) {
         <div className="account">
           <div className="account__greeting">
             Xin chào, <strong>{user.displayName}</strong>
+            <button type="button" className="link" onClick={onProfile}>
+              Hồ sơ
+            </button>
             <button type="button" className="link" onClick={logout}>
               Đăng xuất
             </button>
@@ -59,6 +66,7 @@ export function Home({ onLogin, onRegister }: Props) {
             <span className="balance__amount">{balance.toLocaleString('vi-VN')}</span>
             <span className="balance__unit">củ</span>
           </div>
+          <RewardsBar onShop={onShop} />
         </div>
       )}
 
@@ -101,6 +109,11 @@ export function Home({ onLogin, onRegister }: Props) {
             </button>
           </div>
         )}
+        <div className="auth-links">
+          <button type="button" className="link" onClick={onLeaderboard}>
+            🏆 BXH tuần
+          </button>
+        </div>
       </form>
     </div>
   );

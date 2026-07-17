@@ -7,6 +7,7 @@ import {
   type Combo,
 } from '@card-games/game-tienlen';
 import type { Card, ChatMessage, MatchResult, RoomState } from '@card-games/types';
+import { errorLabel } from '../lib/api';
 import {
   connectSocket,
   emitAck,
@@ -59,7 +60,7 @@ export const useGame = create<GameStore>((set, get) => {
     try {
       await fn();
     } catch (err) {
-      set({ error: (err as Error).message });
+      set({ error: errorLabel(err) });
     }
   };
 

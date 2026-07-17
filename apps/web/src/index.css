@@ -189,6 +189,139 @@ button {
   font-size: 14px;
   text-align: center;
 }
+.form-success {
+  background: rgba(46, 158, 91, 0.3);
+  border: 1px solid #2e9e5b;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ── Trang hồ sơ / BXH ───────────────────── */
+.page {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px 32px;
+}
+.page__header {
+  width: min(560px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  position: sticky;
+  top: 0;
+}
+.page__header span {
+  width: 90px;
+}
+.page__body {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 16px;
+  padding: 16px 20px;
+}
+.profile-card__avatar {
+  flex-shrink: 0;
+}
+.profile-card__name {
+  font-size: 20px;
+  font-weight: 700;
+}
+.profile-card__email {
+  opacity: 0.7;
+  font-size: 13px;
+}
+.profile-card .balance {
+  margin-left: auto;
+  padding: 6px 16px;
+}
+.profile-card .balance__amount {
+  font-size: 20px;
+}
+.stat-row {
+  display: flex;
+  gap: 12px;
+}
+.stat {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 14px;
+  padding: 14px;
+  text-align: center;
+}
+.stat__value {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--gold);
+}
+.stat__label {
+  font-size: 13px;
+  opacity: 0.8;
+}
+.section-title {
+  margin-top: 8px;
+}
+.section-note {
+  opacity: 0.75;
+  font-size: 14px;
+}
+.empty-note {
+  text-align: center;
+  opacity: 0.6;
+  padding: 24px;
+}
+.match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.match-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.match-row--me {
+  outline: 2px solid rgba(240, 192, 64, 0.6);
+}
+.match-row__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.match-row__medal {
+  font-size: 22px;
+  width: 34px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.match-row__title {
+  font-weight: 600;
+}
+.match-row__sub {
+  font-size: 12px;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── Room layout ─────────────────────────── */
 .room {
@@ -699,5 +832,113 @@ button {
   .overlay__panel {
     min-width: min(340px, 88vw);
     padding: 22px 24px;
+  }
+}
+
+/* ── Rewards bar (điểm danh + quảng cáo) ── */
+.rewards {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.rewards__buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.btn--reward {
+  background: rgba(240, 192, 64, 0.16);
+  border: 1px solid rgba(240, 192, 64, 0.5);
+  font-size: 14px;
+  padding: 8px 14px;
+}
+.btn--reward:hover:not(:disabled) {
+  background: rgba(240, 192, 64, 0.28);
+}
+.rewards__msg {
+  font-size: 14px;
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* ── Ad modal ────────────────────────────── */
+.ad-panel {
+  text-align: center;
+  min-width: 320px;
+}
+.ad-panel__video {
+  background: #0d0d0d;
+  border-radius: 12px;
+  padding: 40px 20px;
+  margin-bottom: 18px;
+}
+.ad-panel__video span {
+  font-size: 56px;
+}
+.ad-panel__video p {
+  margin-top: 10px;
+  opacity: 0.7;
+}
+.ad-panel__countdown {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Shop (nạp củ) ───────────────────────── */
+.shop-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+.shop-card__coins {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gold);
+}
+.shop-card__label {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+.shop-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Instant win banner ──────────────────── */
+.instant-win-banner {
+  background: linear-gradient(135deg, #f0c040, #e08a2b);
+  color: #4a3200;
+  border-radius: 12px;
+  padding: 12px 18px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 18px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 18px rgba(240, 192, 64, 0.4);
+}
+.instant-win-banner__who {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+@media (max-width: 700px) {
+  .shop-card {
+    justify-content: center;
+    text-align: center;
+  }
+  .rewards__buttons {
+    width: 100%;
   }
 }

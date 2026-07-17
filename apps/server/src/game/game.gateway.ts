@@ -88,9 +88,9 @@ export class GameGateway
   quickJoin(
     @ConnectedSocket() client: GameSocket,
     @MessageBody() body: { betAmount: number },
-  ): AckResponse<RoomState> {
-    return this.ack(() => {
-      const state = this.rooms.quickJoin(
+  ): Promise<AckResponse<RoomState>> {
+    return this.ackAsync(async () => {
+      const state = await this.rooms.quickJoin(
         this.user(client),
         body?.betAmount ?? 0,
         client.id,
@@ -104,9 +104,9 @@ export class GameGateway
   join(
     @ConnectedSocket() client: GameSocket,
     @MessageBody() body: { roomId: string },
-  ): AckResponse<RoomState> {
-    return this.ack(() => {
-      const state = this.rooms.joinRoom(
+  ): Promise<AckResponse<RoomState>> {
+    return this.ackAsync(async () => {
+      const state = await this.rooms.joinRoom(
         this.user(client),
         body?.roomId,
         client.id,
@@ -186,11 +186,23 @@ export class GameGateway
     try {
       return { ok: true, data: fn() };
     } catch (err) {
-      if (err instanceof RoomError || err instanceof MatchError) {
-        return { ok: false, error: err.message };
-      }
-      this.logger.error('unexpected gateway error', err);
-      return { ok: false, error: 'INTERNAL' };
+      return this.toAckError(err);
     }
+  }
+
+  private async ackAsync<T>(fn: () => Promise<T>): Promise<AckResponse<T>> {
+    try {
+      return { ok: true, data: await fn() };
+    } catch (err) {
+      return this.toAckError(err);
+    }
+  }
+
+  private toAckError(err: unknown): { ok: false; error: string } {
+    if (err instanceof RoomError || err instanceof MatchError) {
+      return { ok: false, error: err.message };
+    }
+    this.logger.error('unexpected gateway error', err);
+    return { ok: false, error: 'INTERNAL' };
   }
 }
