@@ -6,7 +6,14 @@ import {
   validatePlay,
   type Combo,
 } from '@card-games/game-tienlen';
-import type { Card, ChatMessage, MatchResult, RoomState } from '@card-games/types';
+import type {
+  Card,
+  ChatMessage,
+  GameType,
+  MatchResult,
+  RoomState,
+  RoomSummary,
+} from '@card-games/types';
 import { errorLabel } from '../lib/api';
 import {
   connectSocket,
@@ -35,8 +42,13 @@ interface GameStore {
   result: MatchResult | null;
   chat: ChatMessage[];
   error: string | null;
+  /** Danh sách bàn trong sảnh đang xem */
+  rooms: RoomSummary[];
 
   connect: (displayName: string, session?: SocketSession) => void;
+  listRooms: (gameType: GameType) => Promise<void>;
+  createRoom: (gameType: GameType, betAmount: number) => Promise<void>;
+  joinById: (roomId: string) => Promise<void>;
   quickJoin: (betAmount: number) => Promise<void>;
   leave: () => Promise<void>;
   setReady: (ready: boolean) => Promise<void>;
@@ -80,6 +92,7 @@ export const useGame = create<GameStore>((set, get) => {
     result: null,
     chat: [],
     error: null,
+    rooms: [],
 
     connect(displayName, session) {
       localStorage.setItem('cg:displayName', displayName);
@@ -170,6 +183,27 @@ export const useGame = create<GameStore>((set, get) => {
         set((s) => ({ chat: [...s.chat.slice(-49), msg] })),
       );
     },
+
+    listRooms: (gameType) =>
+      guard(async () => {
+        const rooms = await emitAck<RoomSummary[]>('room:list', { gameType });
+        set({ rooms });
+      }),
+
+    createRoom: (gameType, betAmount) =>
+      guard(async () => {
+        const room = await emitAck<RoomState>('room:create', {
+          gameType,
+          betAmount,
+        });
+        set({ room, chat: [], result: null });
+      }),
+
+    joinById: (roomId) =>
+      guard(async () => {
+        const room = await emitAck<RoomState>('room:join', { roomId });
+        set({ room, chat: [], result: null });
+      }),
 
     quickJoin: (betAmount) =>
       guard(async () => {

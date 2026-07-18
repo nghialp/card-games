@@ -16,7 +16,9 @@ import { MatchError } from '@card-games/game-tienlen';
 import type {
   Card,
   ClientToServerEvents,
+  GameType,
   RoomState,
+  RoomSummary,
   ServerToClientEvents,
 } from '@card-games/types';
 import { RoomError, RoomService, type SessionUser } from './room.service';
@@ -84,6 +86,30 @@ export class GameGateway
     this.rooms.onDisconnect(client.id);
   }
 
+  @SubscribeMessage('room:list')
+  listRooms(
+    @MessageBody() body: { gameType: GameType },
+  ): AckResponse<RoomSummary[]> {
+    return this.ack(() => this.rooms.listRooms(body?.gameType ?? 'tienlen'));
+  }
+
+  @SubscribeMessage('room:create')
+  createRoom(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { gameType: GameType; betAmount: number },
+  ): Promise<AckResponse<RoomState>> {
+    return this.ackAsync(async () => {
+      const state = await this.rooms.createRoom(
+        this.user(client),
+        body?.gameType ?? 'tienlen',
+        body?.betAmount ?? 0,
+        client.id,
+      );
+      void client.join(state.id);
+      return state;
+    });
+  }
+
   @SubscribeMessage('room:quickjoin')
   quickJoin(
     @ConnectedSocket() client: GameSocket,
@@ -122,8 +148,10 @@ export class GameGateway
     @MessageBody() body: { roomId: string },
   ): AckResponse {
     return this.ack(() => {
-      this.rooms.leaveRoom(this.user(client).userId);
+      // Rời socket room TRƯỚC: broadcast room:state sau đó (trong leaveRoom)
+      // không tới người vừa rời → client không vô tình dựng lại phòng cũ
       void client.leave(body?.roomId);
+      this.rooms.leaveRoom(this.user(client).userId);
       return undefined;
     });
   }

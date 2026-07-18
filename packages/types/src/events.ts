@@ -1,5 +1,5 @@
 import type { Card } from './card';
-import type { MatchResult, RoomState } from './room';
+import type { GameType, MatchResult, RoomState, RoomSummary } from './room';
 
 /** Mọi ack đều trả về dạng này để client xử lý lỗi thống nhất */
 export type Ack<T = void> = (
@@ -30,6 +30,12 @@ export interface ChatMessage {
 
 /** client → server */
 export interface ClientToServerEvents {
+  /** Danh sách bàn còn chỗ trong sảnh của một game (sắp ít chỗ trống lên đầu) */
+  'room:list': (p: { gameType: GameType }, ack: Ack<RoomSummary[]>) => void;
+  'room:create': (
+    p: { gameType: GameType; betAmount: number },
+    ack: Ack<RoomState>,
+  ) => void;
   'room:join': (p: { roomId: string }, ack: Ack<RoomState>) => void;
   'room:leave': (p: { roomId: string }, ack: Ack) => void;
   'room:quickjoin': (p: { betAmount: number }, ack: Ack<RoomState>) => void;

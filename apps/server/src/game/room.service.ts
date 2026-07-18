@@ -12,7 +12,13 @@ import {
   type InstantWinType,
   type MatchSnapshot,
 } from '@card-games/game-tienlen';
-import type { Card, MatchResult, RoomState } from '@card-games/types';
+import type {
+  Card,
+  GameType,
+  MatchResult,
+  RoomState,
+  RoomSummary,
+} from '@card-games/types';
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -34,10 +40,17 @@ interface PlayerSession extends SessionUser {
   connected: boolean;
   socketId: string;
   lastSeq: number;
+  /**
+   * Rời phòng chủ động (bấm "Rời phòng") giữa ván: giữ ghế cho engine chạy
+   * hết ván nhưng không còn coi là thành viên phòng → được tạo/vào phòng khác.
+   * Khác với connected=false (rớt mạng tạm, vẫn reconnect về ghế cũ được).
+   */
+  left?: boolean;
 }
 
 interface Room {
   id: string;
+  gameType: GameType;
   betAmount: number;
   hostId: string;
   status: RoomState['status'];
@@ -115,6 +128,67 @@ export class RoomService implements OnModuleInit {
     return room ? this.toRoomState(room) : null;
   }
 
+  /** Danh sách bàn còn chỗ của một game — ít chỗ trống nhất lên đầu */
+  listRooms(gameType: GameType): RoomSummary[] {
+    return [...this.rooms.values()]
+      .filter(
+        (r) =>
+          r.gameType === gameType &&
+          r.status === 'waiting' &&
+          r.players.length < MAX_PLAYERS,
+      )
+      .map((r) => ({
+        id: r.id,
+        gameType: r.gameType,
+        betAmount: r.betAmount,
+        playerCount: r.players.length,
+        maxPlayers: MAX_PLAYERS,
+      }))
+      .sort(
+        (a, b) =>
+          a.maxPlayers - a.playerCount - (b.maxPlayers - b.playerCount) ||
+          a.betAmount - b.betAmount,
+      );
+  }
+
+  /** Tạo bàn mới rồi vào luôn (khác quickJoin: luôn tạo phòng riêng) */
+  async createRoom(
+    user: SessionUser,
+    gameType: GameType,
+    betAmount: number,
+    socketId: string,
+  ): Promise<RoomState> {
+    const existing = this.roomOfUser(user.userId);
+    if (existing) {
+      if (existing.status === 'playing') {
+        this.addPlayer(existing, user, socketId);
+        return this.toRoomState(existing);
+      }
+      this.leaveRoom(user.userId);
+    }
+    await this.assertBalance(user.userId, betAmount);
+    const room = this.newRoom(gameType, betAmount, user.userId);
+    this.rooms.set(room.id, room);
+    this.addPlayer(room, user, socketId);
+    return this.toRoomState(room);
+  }
+
+  private newRoom(gameType: GameType, betAmount: number, hostId: string): Room {
+    return {
+      id: randomUUID().slice(0, 8),
+      gameType,
+      betAmount,
+      hostId,
+      status: 'waiting',
+      players: [],
+      match: null,
+      matchId: null,
+      matchStartedAt: 0,
+      turnTimer: null,
+      turnEndsAt: 0,
+    };
+  }
+
   async quickJoin(
     user: SessionUser,
     betAmount: number,
@@ -139,18 +213,7 @@ export class RoomService implements OnModuleInit {
         r.players.length < MAX_PLAYERS,
     );
     if (!room) {
-      room = {
-        id: randomUUID().slice(0, 8),
-        betAmount,
-        hostId: user.userId,
-        status: 'waiting',
-        players: [],
-        match: null,
-        matchId: null,
-        matchStartedAt: 0,
-        turnTimer: null,
-        turnEndsAt: 0,
-      };
+      room = this.newRoom('tienlen', betAmount, user.userId);
       this.rooms.set(room.id, room);
     }
     this.addPlayer(room, user, socketId);
@@ -213,8 +276,15 @@ export class RoomService implements OnModuleInit {
     const room = this.roomOfUser(userId);
     if (!room) return;
     if (room.status === 'playing') {
-      // Đang trong ván: giữ ghế, đánh dấu mất kết nối — timer sẽ auto-pass
-      this.markConnected(room, userId, false);
+      // Rời giữa ván = bỏ cuộc: đánh dấu "đã rời" (không còn là thành viên
+      // phòng, để tạo/vào phòng khác), giữ ghế cho engine chạy hết ván (auto-pass)
+      const player = room.players.find((p) => p.userId === userId);
+      if (player) {
+        player.left = true;
+        player.connected = false;
+      }
+      this.broadcastRoomState(room);
+      this.persist(room);
       return;
     }
     room.players = room.players.filter((p) => p.userId !== userId);
@@ -405,7 +475,7 @@ export class RoomService implements OnModuleInit {
     this.persistence
       .recordMatch({
         matchId: room.matchId!,
-        gameType: 'tienlen',
+        gameType: room.gameType,
         betAmount: room.betAmount,
         startedAt: new Date(room.matchStartedAt),
         players: rankedPlayers.map((p, i) => ({
@@ -512,6 +582,7 @@ export class RoomService implements OnModuleInit {
       }
       const room: Room = {
         id: data.id,
+        gameType: 'tienlen', // hiện chỉ có tienlen — persist chưa lưu gameType
         betAmount: data.betAmount,
         hostId: data.hostId,
         status: data.status,
@@ -542,6 +613,7 @@ export class RoomService implements OnModuleInit {
     if (existing) {
       existing.socketId = socketId;
       existing.connected = true;
+      existing.left = false; // quay lại chính phòng vừa rời → hủy cờ đã-rời
       this.broadcastRoomState(room);
       return;
     }
@@ -576,7 +648,7 @@ export class RoomService implements OnModuleInit {
   private toRoomState(room: Room): RoomState {
     return {
       id: room.id,
-      gameType: 'tienlen',
+      gameType: room.gameType,
       status: room.status,
       hostId: room.hostId,
       betAmount: room.betAmount,
@@ -593,8 +665,9 @@ export class RoomService implements OnModuleInit {
   }
 
   private roomOfUser(userId: string): Room | undefined {
+    // Bỏ qua phòng mà user đã chủ động rời (ghế còn nhưng không còn là thành viên)
     return [...this.rooms.values()].find((r) =>
-      r.players.some((p) => p.userId === userId),
+      r.players.some((p) => p.userId === userId && !p.left),
     );
   }
 

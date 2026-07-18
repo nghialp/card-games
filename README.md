@@ -43,7 +43,9 @@ docs/
 
 - [Thiết kế tổng thể](docs/game-design.md) — game, công nghệ, hệ thống server, roadmap
 - [Kế hoạch client web + mobile](docs/client-plan.md)
+- [Kế hoạch phát triển mobile](docs/mobile-plan.md) — tách client-core, IAP, reconnect, lộ trình
 - [Hướng dẫn deploy](docs/deploy.md)
+- [Lộ trình microservice](docs/microservices-roadmap.md) — vì sao giữ monolith, khi nào & cách tách
 - [Phác thảo kiến trúc ban đầu](docs/initial-architecture-sketch.md) (đã được thay thế bởi game-design.md)
 
 ## Kiểm thử

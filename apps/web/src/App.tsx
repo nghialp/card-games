@@ -1,36 +1,45 @@
 import { useState } from 'react';
+import type { GameType } from '@card-games/types';
 import { useGame } from './store/game';
-import { Home } from './screens/Home';
+import { GamesHub } from './screens/GamesHub';
 import { Leaderboard } from './screens/Leaderboard';
+import { Lobby } from './screens/Lobby';
 import { Login } from './screens/Login';
 import { Profile } from './screens/Profile';
 import { Register } from './screens/Register';
 import { Room } from './screens/Room';
 import { Shop } from './screens/Shop';
 
-type Screen = 'home' | 'login' | 'register' | 'profile' | 'leaderboard' | 'shop';
+type Screen = 'hub' | 'lobby' | 'login' | 'register' | 'profile' | 'leaderboard' | 'shop';
 
 export default function App() {
   const room = useGame((s) => s.room);
   const error = useGame((s) => s.error);
   const clearError = useGame((s) => s.clearError);
-  const [screen, setScreen] = useState<Screen>('home');
-  const goHome = () => setScreen('home');
+  const [screen, setScreen] = useState<Screen>('hub');
+  const [lobbyGame, setLobbyGame] = useState<GameType>('tienlen');
+  const goHub = () => setScreen('hub');
 
   const content = room ? (
     <Room />
   ) : screen === 'login' ? (
-    <Login onDone={goHome} onRegister={() => setScreen('register')} />
+    <Login onDone={goHub} onRegister={() => setScreen('register')} />
   ) : screen === 'register' ? (
-    <Register onDone={goHome} onLogin={() => setScreen('login')} />
+    <Register onDone={goHub} onLogin={() => setScreen('login')} />
   ) : screen === 'profile' ? (
-    <Profile onBack={goHome} />
+    <Profile onBack={goHub} />
   ) : screen === 'leaderboard' ? (
-    <Leaderboard onBack={goHome} />
+    <Leaderboard onBack={goHub} />
   ) : screen === 'shop' ? (
-    <Shop onBack={goHome} />
+    <Shop onBack={goHub} />
+  ) : screen === 'lobby' ? (
+    <Lobby gameType={lobbyGame} onBack={goHub} />
   ) : (
-    <Home
+    <GamesHub
+      onEnterLobby={(g) => {
+        setLobbyGame(g);
+        setScreen('lobby');
+      }}
       onLogin={() => setScreen('login')}
       onRegister={() => setScreen('register')}
       onProfile={() => setScreen('profile')}

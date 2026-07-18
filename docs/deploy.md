@@ -89,6 +89,17 @@ Kiểm tra server sống: `curl http://localhost:3000/health` → `{"status":"ok
 > verify HMAC) nhưng **chưa chạy với tài khoản merchant thật** — cần credentials
 > sandbox để kiểm chứng trước khi bật ở production.
 
+### Luồng điều hướng client
+
+Trang chủ (danh sách game) → Sảnh của game (danh sách bàn còn chỗ, sắp bàn ít
+chỗ trống lên đầu) → Bàn chơi. Trong sảnh: tạo phòng, vào nhanh (ngẫu nhiên),
+vào theo số phòng, hoặc click một bàn còn chỗ. Danh sách bàn tự làm mới mỗi 3s.
+
+Socket events liên quan: `room:list` (danh sách bàn của game), `room:create`
+(tạo bàn mới), `room:join` (vào theo id), `room:quickjoin` (ngẫu nhiên/theo cược).
+Phòng lưu in-memory theo instance — multi-instance cần sticky session theo room
+(và gộp danh sách bàn qua Redis, chưa làm) — xem game-design.md 3.4.
+
 ### API mới (auth bằng Bearer token trừ khi ghi công khai)
 
 | Endpoint | Mô tả |

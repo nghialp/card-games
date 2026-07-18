@@ -23,6 +23,15 @@ export interface RoomState {
   players: RoomPlayer[];
 }
 
+/** Bản tóm tắt phòng để hiển thị trong sảnh (không kèm thông tin ván) */
+export interface RoomSummary {
+  id: string;
+  gameType: GameType;
+  betAmount: number;
+  playerCount: number;
+  maxPlayers: number;
+}
+
 export interface MatchResult {
   matchId: string;
   /** userId theo thứ hạng, phần tử 0 là người thắng */
