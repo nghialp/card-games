@@ -61,7 +61,8 @@ Kiểm tra server sống: `curl http://localhost:3000/health` → `{"status":"ok
 | `pnpm build` | Build tất cả package (Turborepo, có cache) |
 | `pnpm test` | Chạy toàn bộ unit test |
 | `pnpm --filter @card-games/game-tienlen test` | Chỉ test luật bài |
-| `pnpm --filter @card-games/server bot:match` | **E2E smoke test**: 4 bot vào phòng chơi nguyên 1 ván (server phải đang chạy; trỏ server khác bằng `SERVER_URL=`) |
+| `pnpm --filter @card-games/server bot:match` | **E2E smoke test Tiến Lên**: 4 bot chơi nguyên 1 ván (server phải đang chạy; trỏ server khác bằng `SERVER_URL=`) |
+| `pnpm --filter @card-games/server tusac:bot` | **E2E smoke test Tứ Sắc**: 4 bot chơi trọn 1 ván qua socket `tusac:*` |
 | `pnpm --filter @card-games/server exec prisma studio` | GUI xem dữ liệu DB |
 | `pnpm --filter @card-games/server exec prisma migrate dev` | Tạo migration mới sau khi sửa schema.prisma |
 | `docker compose -f infra/docker-compose.yml down` | Tắt Postgres/Redis |

@@ -13,7 +13,7 @@ export const GAMES: GameInfo[] = [
   { type: 'tienlen', name: 'Tiến Lên Miền Nam', emoji: '🃏', players: '2–4 người', available: true },
   { type: 'phom', name: 'Phỏm (Tá Lả)', emoji: '🀄', players: '2–4 người', available: false },
   { type: 'binh', name: 'Mậu Binh', emoji: '🎴', players: '2–4 người', available: false },
-  { type: 'tusac', name: 'Tứ Sắc', emoji: '🔴', players: '2–4 người', available: false },
+  { type: 'tusac', name: 'Tứ Sắc', emoji: '🔴', players: '2–4 người', available: true },
   { type: 'poker', name: 'Poker', emoji: '♠️', players: '2–9 người', available: false },
 ];
 

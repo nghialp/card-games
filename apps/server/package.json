@@ -6,10 +6,12 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
-    "bot:match": "tsx scripts/bot-match.ts"
+    "bot:match": "tsx scripts/bot-match.ts",
+    "tusac:bot": "tsx scripts/tusac-bot.ts"
   },
   "dependencies": {
     "@card-games/game-tienlen": "workspace:*",
+    "@card-games/game-tusac": "workspace:*",
     "@card-games/types": "workspace:*",
     "@shared-libs/auth": "workspace:*",
     "@shared-libs/payment": "workspace:*",

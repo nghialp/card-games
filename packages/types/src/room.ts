@@ -1,4 +1,4 @@
-export type GameType = 'tienlen';
+export type GameType = 'tienlen' | 'tusac';
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished';
 

@@ -4,6 +4,7 @@ import { AuthService } from './auth/auth.service';
 import { HealthController } from './health.controller';
 import { GameGateway } from './game/game.gateway';
 import { RoomService } from './game/room.service';
+import { TuSacService } from './tusac/tusac.service';
 import { MetricsController } from './metrics/metrics.controller';
 import { MetricsService } from './metrics/metrics.service';
 import { RewardsController } from './shop/rewards.controller';
@@ -33,6 +34,7 @@ import { RedisService } from './persistence/redis.service';
     RewardsService,
     GameGateway,
     RoomService,
+    TuSacService,
     RedisService,
     PrismaService,
     MatchPersistenceService,

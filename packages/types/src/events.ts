@@ -1,5 +1,12 @@
 import type { Card } from './card';
 import type { GameType, MatchResult, RoomState, RoomSummary } from './room';
+import type {
+  TuSacMatchState,
+  TuSacResponse,
+  TuSacResult,
+  TuSacRoomState,
+  TuSacTile,
+} from './tusac';
 
 /** Mọi ack đều trả về dạng này để client xử lý lỗi thống nhất */
 export type Ack<T = void> = (
@@ -46,6 +53,20 @@ export interface ClientToServerEvents {
   ) => void;
   'game:pass': (p: { roomId: string; seq: number }, ack: Ack) => void;
   'chat:send': (p: { roomId: string; text: string }, ack: Ack) => void;
+
+  // ── Tứ Sắc ──
+  'tusac:create': (p: { betAmount: number }, ack: Ack<TuSacRoomState>) => void;
+  'tusac:join': (p: { roomId: string }, ack: Ack<TuSacRoomState>) => void;
+  'tusac:list': (p: Record<string, never>, ack: Ack<TuSacRoomState[]>) => void;
+  'tusac:ready': (p: { roomId: string; ready: boolean }, ack: Ack) => void;
+  'tusac:leave': (p: { roomId: string }, ack: Ack) => void;
+  'tusac:draw': (p: { roomId: string }, ack: Ack) => void;
+  'tusac:discard': (p: { roomId: string; tile: TuSacTile }, ack: Ack) => void;
+  'tusac:respond': (
+    p: { roomId: string; response: TuSacResponse },
+    ack: Ack,
+  ) => void;
+  'tusac:win': (p: { roomId: string }, ack: Ack) => void;
 }
 
 /** server → client */
@@ -58,4 +79,11 @@ export interface ServerToClientEvents {
   'game:turn': (p: TurnPayload) => void;
   'game:ended': (result: MatchResult) => void;
   'chat:message': (msg: ChatMessage) => void;
+
+  // ── Tứ Sắc ──
+  'tusac:room': (state: TuSacRoomState) => void;
+  /** Chỉ gửi riêng cho từng người — bài trên tay */
+  'tusac:hand': (p: { tiles: TuSacTile[] }) => void;
+  'tusac:state': (state: TuSacMatchState) => void;
+  'tusac:ended': (result: TuSacResult) => void;
 }

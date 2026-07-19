@@ -20,8 +20,12 @@ import type {
   RoomState,
   RoomSummary,
   ServerToClientEvents,
+  TuSacResponse,
+  TuSacRoomState,
+  TuSacTile,
 } from '@card-games/types';
 import { RoomError, RoomService, type SessionUser } from './room.service';
+import { TuSacError, TuSacService } from '../tusac/tusac.service';
 
 type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;
 type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
@@ -47,10 +51,14 @@ export class GameGateway
   @WebSocketServer()
   server!: GameServer;
 
-  constructor(private readonly rooms: RoomService) {}
+  constructor(
+    private readonly rooms: RoomService,
+    private readonly tusac: TuSacService,
+  ) {}
 
   afterInit(server: GameServer): void {
     this.rooms.setServer(server);
+    this.tusac.setServer(server);
   }
 
   handleConnection(client: GameSocket): void {
@@ -84,6 +92,7 @@ export class GameGateway
 
   handleDisconnect(client: GameSocket): void {
     this.rooms.onDisconnect(client.id);
+    this.tusac.onDisconnect(client.id);
   }
 
   @SubscribeMessage('room:list')
@@ -205,6 +214,104 @@ export class GameGateway
     });
   }
 
+  // ── Tứ Sắc ──────────────────────────────────────────────
+
+  @SubscribeMessage('tusac:create')
+  tusacCreate(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { betAmount: number },
+  ): AckResponse<TuSacRoomState> {
+    return this.ack(() => {
+      const state = this.tusac.create(this.user(client), body?.betAmount ?? 0, client.id);
+      void client.join(state.id);
+      return state;
+    });
+  }
+
+  @SubscribeMessage('tusac:join')
+  tusacJoin(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { roomId: string },
+  ): AckResponse<TuSacRoomState> {
+    return this.ack(() => {
+      const state = this.tusac.join(this.user(client), body?.roomId, client.id);
+      void client.join(state.id);
+      return state;
+    });
+  }
+
+  @SubscribeMessage('tusac:list')
+  tusacList(): AckResponse<TuSacRoomState[]> {
+    return this.ack(() => this.tusac.list());
+  }
+
+  @SubscribeMessage('tusac:ready')
+  tusacReady(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { roomId: string; ready: boolean },
+  ): AckResponse {
+    return this.ack(() => {
+      this.tusac.setReady(body?.roomId, this.user(client).userId, !!body?.ready);
+      return undefined;
+    });
+  }
+
+  @SubscribeMessage('tusac:leave')
+  tusacLeave(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { roomId: string },
+  ): AckResponse {
+    return this.ack(() => {
+      this.tusac.leave(this.user(client).userId);
+      void client.leave(body?.roomId);
+      return undefined;
+    });
+  }
+
+  @SubscribeMessage('tusac:draw')
+  tusacDraw(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { roomId: string },
+  ): AckResponse {
+    return this.ack(() => {
+      this.tusac.draw(body?.roomId, this.user(client).userId);
+      return undefined;
+    });
+  }
+
+  @SubscribeMessage('tusac:discard')
+  tusacDiscard(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { roomId: string; tile: TuSacTile },
+  ): AckResponse {
+    return this.ack(() => {
+      this.tusac.discard(body?.roomId, this.user(client).userId, body?.tile);
+      return undefined;
+    });
+  }
+
+  @SubscribeMessage('tusac:respond')
+  tusacRespond(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { roomId: string; response: TuSacResponse },
+  ): AckResponse {
+    return this.ack(() => {
+      this.tusac.respond(body?.roomId, this.user(client).userId, body?.response);
+      return undefined;
+    });
+  }
+
+  @SubscribeMessage('tusac:win')
+  tusacWin(
+    @ConnectedSocket() client: GameSocket,
+    @MessageBody() body: { roomId: string },
+  ): AckResponse {
+    return this.ack(() => {
+      this.tusac.declareWin(body?.roomId, this.user(client).userId);
+      return undefined;
+    });
+  }
+
   private user(client: GameSocket): SessionUser {
     return client.data.user as SessionUser;
   }
@@ -227,7 +334,7 @@ export class GameGateway
   }
 
   private toAckError(err: unknown): { ok: false; error: string } {
-    if (err instanceof RoomError || err instanceof MatchError) {
+    if (err instanceof RoomError || err instanceof MatchError || err instanceof TuSacError) {
       return { ok: false, error: err.message };
     }
     this.logger.error('unexpected gateway error', err);
