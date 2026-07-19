@@ -44,6 +44,38 @@ describe('TuSacMatch — luồng cơ bản', () => {
     expect(m.phase).toBe('awaiting-draw');
   });
 
+  it('lật TƯỚNG không ai khui/tới → kéo về phơi (Tướng lẻ) + phải đánh 1 rác', () => {
+    const m = new TuSacMatch(
+      [[t(Cannon, Green), t(Horse, White)], [t(Advisor, White), t(Elephant, Green)]],
+      [t(General, Red)],
+    );
+    m.discard(0, t(Cannon, Green)); // không ai ăn → seat1 lật
+    expect(m.turn).toBe(1);
+    m.draw(1); // lật Tướng đỏ — không ai khui/tới
+    // Tướng kéo về phơi trước mặt seat1 (không vào đống rác, không vào tay)
+    const s1 = m.publicState().seats[1];
+    expect(s1.melds).toHaveLength(1);
+    expect(s1.melds[0]).toEqual([t(General, Red)]);
+    expect(s1.handCount).toBe(2);
+    expect(m.publicState().discards).toHaveLength(1); // chỉ có Pháo xanh lúc đầu
+    // và seat1 phải đánh ra 1 rác (giữ lượt)
+    expect(m.turn).toBe(1);
+    expect(m.phase).toBe('awaiting-discard');
+  });
+
+  it('Tướng bị ĐÁNH RA (không phải lật) mà không ai ăn → vào đống rác như thường', () => {
+    const m = new TuSacMatch(
+      [[t(General, Red), t(Cannon, Green)], [t(Advisor, White), t(Elephant, Green)]],
+      [],
+    );
+    m.discard(0, t(General, Red)); // seat1 không tới/khui được
+    expect(
+      m.publicState().discards.some((d) => d.piece === General && d.color === Red),
+    ).toBe(true);
+    expect(m.turn).toBe(1);
+    expect(m.phase).toBe('awaiting-draw');
+  });
+
   it('nhà cái theo dealerSeat: cái đi trước', () => {
     const m = new TuSacMatch(
       [[t(Cannon, Green)], [t(Advisor, White), t(Chariot, Red)]],

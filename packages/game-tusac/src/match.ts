@@ -1,4 +1,4 @@
-import { pieceOfCell, colorOfCell, sameTile, toCounts, type Tile } from './tiles';
+import { Piece, pieceOfCell, colorOfCell, sameTile, toCounts, type Tile } from './tiles';
 import { isWinningHand } from './melds';
 import { canWin, isTenpai, legalClaims, type Claim } from './claims';
 
@@ -280,13 +280,24 @@ export class TuSacMatch {
     this.clearWindow();
   }
 
-  /** Không ai ăn: lá vào đống rác công khai; người kế của from lật tiếp. */
+  /**
+   * Không ai ăn:
+   * - Lá thường → vào đống rác công khai; người kế của from lật tiếp.
+   * - Riêng TƯỚNG tự lật (§5.1): người lật KÉO Tướng về phơi trước mặt
+   *   (Tướng lẻ hợp lệ) rồi phải đánh ra 1 lá rác.
+   */
   private dropAndAdvance(tile: Tile, from: number, kind: 'discard' | 'draw'): void {
+    if (kind === 'draw' && tile.piece === Piece.General) {
+      this.melds[from].push([{ ...tile }]);
+      this.turnSeat = from;
+      this.phaseState = 'awaiting-discard';
+      this.clearWindow();
+      return;
+    }
     this.discardPile.push({ ...tile });
     this.turnSeat = (from + 1) % this.n;
     this.phaseState = 'awaiting-draw';
     this.clearWindow();
-    void kind;
   }
 
   /** Hạ mọi bộ 4 lá giống nhau trong tay thành quằn phơi ra chiếu. */

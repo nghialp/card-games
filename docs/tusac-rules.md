@@ -134,8 +134,11 @@ từ nọc), người chơi được **ăn** (lấy lá đó ghép nhóm rồi p
   Nếu người có quằn **tới** → **tới quan** (×2 tiền, xem §10).
 - **Ăn bằng rác** (ghép các lá lẻ để ăn, vd Pháo+Mã ăn Xe): **chỉ được khi tới lượt mình**.
 - **Giật vòng (ăn ngoài lượt):** chỉ được khi hoàn thành bằng **đôi, khạp, hoặc tới**.
-- **Lật Tướng:** người lật Tướng **bắt buộc đánh ra 1 lá rác**; nếu ai đó đã hết rác thì
-  người đó có thể **tới** trên con Tướng vừa lật.
+- **Lật Tướng (CHỐT):** khi lá lật là Tướng — người khác được **Khui** (giật bằng 3 Tướng)
+  hoặc **Tới**; nếu **không ai khui/tới**, người lật **kéo Tướng về phơi trước mặt mình**
+  (Tướng lẻ hợp lệ) và **bắt buộc đánh ra 1 lá rác** (giữ lượt). Khác lá thường
+  (không ai ăn → bỏ vào đống rác, người kế lật). Tướng bị **đánh ra** từ tay (không phải
+  lật) mà không ai ăn thì vẫn vào đống rác như thường.
 
 ### 5.2. Bộ Xe – Pháo – Mã (chỉ tính **cùng màu**)
 

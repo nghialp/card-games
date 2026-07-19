@@ -1,8 +1,9 @@
 import type { Tile } from '@card-games/game-tusac';
 
 /**
- * Quân bài theo bộ bài Tứ Sắc thật:
- * - Nền theo sắc (đỏ/vàng/xanh/trắng), chữ ĐEN in đậm trên mọi màu.
+ * Quân bài theo bộ bài Tứ Sắc giấy (như game thật):
+ * - Dải đứng hẹp, nền màu theo sắc, chữ ĐEN in đậm.
+ * - Chữ in HAI ĐẦU: đầu trên xuôi, đầu dưới lộn ngược (đối xứng tâm).
  * - Đỏ & Vàng dùng bộ chữ bên soái: 帥 仕 相 俥 砲 傌 兵
  * - Xanh & Trắng dùng bộ chữ bên tướng: 將 士 象 車 炮 馬 卒
  * (thứ tự: Tướng, Sỹ, Tượng, Xe, Pháo, Mã, Tốt)
@@ -13,7 +14,7 @@ const CHARS_BLACK_SIDE = ['將', '士', '象', '車', '炮', '馬', '卒'] as co
 const PIECE_NAMES = ['Tướng', 'Sỹ', 'Tượng', 'Xe', 'Pháo', 'Mã', 'Tốt'] as const;
 const COLOR_NAMES = ['Đỏ', 'Vàng', 'Xanh', 'Trắng'] as const;
 /** Nền lá bài: Đỏ, Vàng, Xanh, Trắng — theo bộ bài giấy */
-const COLOR_BG = ['#e05a20', '#f2d024', '#3fae4f', '#f7f4ec'] as const;
+const COLOR_BG = ['#d63426', '#f5d417', '#2ea84f', '#f8f7f2'] as const;
 
 const tileChar = (t: Tile): string =>
   t.color === 0 || t.color === 1 ? CHARS_RED_SIDE[t.piece] : CHARS_BLACK_SIDE[t.piece];
@@ -29,6 +30,7 @@ interface Props {
 }
 
 export function TuSacTileView({ tile, selected, onClick, size = 'normal' }: Props) {
+  const ch = tileChar(tile);
   return (
     <button
       type="button"
@@ -45,10 +47,8 @@ export function TuSacTileView({ tile, selected, onClick, size = 'normal' }: Prop
       disabled={!onClick}
       title={tusacTileLabel(tile)}
     >
-      <span className="ts-tile__cap" />
-      <span className="ts-tile__char">{tileChar(tile)}</span>
-      <span className="ts-tile__name">{PIECE_NAMES[tile.piece]}</span>
-      <span className="ts-tile__cap" />
+      <span className="ts-tile__char">{ch}</span>
+      <span className="ts-tile__char ts-tile__char--flip">{ch}</span>
     </button>
   );
 }
