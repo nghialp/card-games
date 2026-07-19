@@ -136,6 +136,13 @@ describe('legalClaims — liền không được xé (§5.1)', () => {
     expect(legalClaims(hand, t(Soldier, Red), IN_TURN)).toEqual([]);
   });
 
+  it('2 Tướng + Sỹ + Tượng = Tướng lẻ + liền (0 rác) → KHÔNG được ăn Sỹ/Tượng lật', () => {
+    // sắp đúng: {T lẻ} + {liền T-S-Tg} — hết rác, xé ra ăn là phá liền
+    const hand = [t(General, Red), t(General, Red), t(Advisor, Red), t(Elephant, Red)];
+    expect(legalClaims(hand, t(Advisor, Red), IN_TURN)).toEqual([]);
+    expect(legalClaims(hand, t(Elephant, Red), IN_TURN)).toEqual([]);
+  });
+
   it('bụng XXPM vẫn ăn được (liền chưa chốt vì có lá đôi chồng)', () => {
     const hand = [t(Chariot, Red), t(Chariot, Red), t(Cannon, Red), t(Horse, Red)];
     const cl = legalClaims(hand, t(Chariot, Red), IN_TURN);

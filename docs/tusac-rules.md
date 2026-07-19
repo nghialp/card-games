@@ -107,6 +107,8 @@ từ nọc), người chơi được **ăn** (lấy lá đó ghép nhóm rồi p
   cấm dùng Sỹ+Tượng ăn). **Riêng liền 3 Tốt** được ăn **đúng con Tốt màu còn lại**
   để nâng trọn bộ thành liền 4 Tốt. Ngoại lệ bụng (§3.1): liền chưa "chốt" khi có
   lá đôi chồng lấp (vd Xe-Xe-Pháo-Mã) thì vẫn ăn theo nguyên tắc ít-rác-nhất.
+  - Ví dụ đã chốt: **2 Tướng + Sỹ + Tượng** sắp đúng là {Tướng lẻ} + {liền T-S-Tg}
+    — **hết rác** → lật Sỹ/Tượng **không được ăn** (xé kiểu gì cũng phá liền/tạo rác).
 - **Ăn đúng cửa (CHỐT — cập nhật từ tusac-bosung.md):** lá đánh ra thuộc **cửa** của
   người kế bên phải người đánh. **Ăn bằng rác** (1 rác + lá ăn thành đôi) và **ăn vào
   lẻ** (liền) **chỉ dành cho người đúng cửa**. Người khác cửa chỉ được **giành** bằng
