@@ -170,5 +170,15 @@ export function seatOf(room: TuSacRoomState | null): number {
   return room?.players.find((p) => p.userId === getUserId())?.seat ?? -1;
 }
 
+/**
+ * Sắp bài gom theo bộ: mỗi màu là một cụm (Tướng-Sỹ-Tượng rồi Xe-Pháo-Mã
+ * đứng cạnh nhau để thấy liền), toàn bộ Tốt gom cuối theo màu.
+ */
+const groupKey = (t: Tile): number => {
+  if (t.piece === 6) return 1000 + t.color; // Tốt: cụm riêng cuối tay bài
+  const block = t.piece <= 2 ? 0 : 1; // TST trước, XPM sau trong mỗi màu
+  return t.color * 20 + block * 10 + t.piece;
+};
+
 const sortTiles = (tiles: Tile[]): Tile[] =>
-  [...tiles].sort((a, b) => a.piece - b.piece || a.color - b.color);
+  [...tiles].sort((a, b) => groupKey(a) - groupKey(b));

@@ -29,13 +29,38 @@ lá lẻ/"rác") thì **tới** (ù) và thắng. Không dùng bộ 52 lá → e
 
 → 7 × 4 × 4 = **112 lá**. Một lá xác định bởi **(quân, màu)**; có 4 lá giống hệt nhau.
 
+**Hiển thị lá bài (UI):** nền theo sắc, chữ **đen in đậm**. Hai bộ ký tự Hán theo phe
+(giống bộ bài giấy): **Đỏ & Vàng** dùng 帥 仕 相 俥 砲 傌 兵; **Xanh & Trắng** dùng
+將 士 象 車 炮 馬 卒 (thứ tự Tướng–Sỹ–Tượng–Xe–Pháo–Mã–Tốt).
+
 ---
 
-## 3. Số người & chia bài
+## 3. Số người, chia bài & nhà cái
 
 - 2–4 người. **Nhà cái** nhận **21 lá** (dư 1 để đánh trước), **mỗi người còn lại 20 lá**
-  (áp dụng cho cả bàn 2, 3 hay 4 người).
-- Phần bài còn lại làm **nọc** (draw pile).
+  (áp dụng cho cả bàn 2, 3 hay 4 người). *(Ngoài đời chia 5 lá một lượt — nghi thức,
+  không ảnh hưởng engine.)*
+- Phần bài còn lại làm **nọc** (còn gọi **tỳ**, draw pile).
+
+**Chọn nhà cái (CHỐT):**
+- Ván đầu tiên: **ai vào phòng trước** là nhà cái.
+- Các ván sau: **ai tới ván trước** cầm cái.
+- Nhà cái rời phòng: **người bên tay phải** (kế tiếp theo lượt) cầm cái.
+
+### 3.1. Khái niệm cơ bản
+
+| Thuật ngữ | Nghĩa |
+|---|---|
+| **Chẵn** | Nhóm 2–4 lá giống nhau cùng màu (đôi/khạp/quằn); Tốt 3–4 lá **khác màu**; Tướng 1–4 lá |
+| **Lẻ** | Bộ ba **liền**: Tướng–Sỹ–Tượng hoặc Xe–Pháo–Mã cùng màu |
+| **Rác (cu ki)** | Lá thừa không xếp được vào chẵn/lẻ |
+| **Xên** | Bài đã hết rác (tròn cấu trúc), đang chờ tới |
+| **Chờ tới** | Hết rác hoặc còn 1 rác/1 phôi — chỉ cần 1 lá phù hợp là tới |
+| **Bụng** | Tay kiểu Xe-Xe-Pháo-Mã (đôi chồng lên liền) — không được xé đôi ra ăn nếu làm thừa rác (nguyên tắc ít-rác-nhất §5.1 xử tự động) |
+| **Tề bài** | Chủ động đánh bớt 1 lá của bụng để giữ bộ liền |
+| **Đứt đầu** | Thiếu 1 quân của bộ liền (vd có Sỹ-Tượng thiếu Tướng = "đứt đầu tướng") |
+| **Nhập xác** | Đang đứt đầu tướng mà lật/ăn được Tướng → thành liền |
+| **Đền bài** | Ngoài đời: ăn sai/tới lộn phải đền — **bản digital không cần**: engine chặn mọi nước sai (anti-rác, validate tới) |
 
 ---
 
@@ -67,11 +92,39 @@ từ nọc), người chơi được **ăn** (lấy lá đó ghép nhóm rồi p
 - **Nguyên tắc "ít rác nhất" (CHỐT):** một nước ăn **tùy chọn** chỉ hợp lệ nếu để lại
   **ít rác nhất**. Nếu tồn tại nước ăn khác để lại **ít lá lẻ hơn**, thì nước làm thừa
   rác bị loại. *(Nguyên tắc tổng quát này tái tạo đúng mọi ca cụ thể ở §5.2–5.4 — vd
-  "2 Xe + Pháo + Mã → không được đôi Xe". Đã cài trong `legalClaims` + `looseCount`.)*
-- **Giật trên lá lật (CHỐT):** người chưa tới lượt được **giật** (đôi/khạp/tới) cả trên
-  **lá đánh ra** lẫn **lá người khác bốc từ nọc** — lá tự chuyển sang người giật.
-- **Quằn hạ ngay (CHỐT):** có **4 lá giống nhau** (khui khi ăn HOẶC quằn có sẵn/bốc được)
-  thì **hạ xuống bàn ngay lập tức** thành quằn phơi; tới khi có quằn phơi = **tới quan**.
+  "2 Xe + Pháo + Mã → không được đôi Xe", và cả luật **Bụng** §3.1. Đã cài trong
+  `legalClaims` + `looseCount`.)*
+- **Anti-rác TUYỆT ĐỐI (CHỐT — bổ sung khi test):** nước ăn không được để lại **nhiều
+  rác hơn hiện trạng tay bài** — ăn không được TẠO rác mới. Vd Tướng + đôi Sỹ (0 rác),
+  lật Tượng: **không được xé Tướng+Sỹ ăn liền** (sẽ để 1 Sỹ thành rác). Ngược lại
+  Tướng + 1 Sỹ rác thì ăn liền hợp lệ (giảm rác).
+- **Khạp không được xé — mọi trường hợp (CHỐT — bổ sung khi test):** ô nào đang có
+  **≥3 lá giống nhau** thì mọi nước lấy lá từ ô đó đều bị cấm (kể cả ăn thành đôi hay
+  ghép liền), **trừ chính nước khui** (giật lá thứ 4).
+- **Liền không được xé (CHỐT — bổ sung khi test):** đã có bộ liền hoàn chỉnh
+  (Tướng-Sỹ-Tượng / Xe-Pháo-Mã cùng màu / 3 Tốt khác màu) thì **không được xé** ra
+  ăn bất kỳ lá nào — kể cả khi lá để lại là Tướng lẻ (vd liền T-S-Tg, lật Tướng:
+  cấm dùng Sỹ+Tượng ăn). **Riêng liền 3 Tốt** được ăn **đúng con Tốt màu còn lại**
+  để nâng trọn bộ thành liền 4 Tốt. Ngoại lệ bụng (§3.1): liền chưa "chốt" khi có
+  lá đôi chồng lấp (vd Xe-Xe-Pháo-Mã) thì vẫn ăn theo nguyên tắc ít-rác-nhất.
+- **Ăn đúng cửa (CHỐT — cập nhật từ tusac-bosung.md):** lá đánh ra thuộc **cửa** của
+  người kế bên phải người đánh. **Ăn bằng rác** (1 rác + lá ăn thành đôi) và **ăn vào
+  lẻ** (liền) **chỉ dành cho người đúng cửa**. Người khác cửa chỉ được **giành** bằng
+  đôi (→khạp), khui (→quằn), hoặc tới.
+- **Ưu tiên chẵn trước, lẻ sau (CHỐT):** khi nhiều người muốn cùng một lá:
+  `tới > khui (quằn) > đôi (khạp) > ăn rác thành đôi (cửa) > ăn lẻ/liền (cửa)`.
+  Trong nhóm chẵn, ai nhiều lá chẵn hơn ưu tiên hơn (đôi > 1 rác). Đồng hạng → gần
+  người đánh hơn (theo chiều lượt) thắng.
+- **Lá lật từ nọc là công khai, KHÔNG vào tay (CHỐT — cập nhật):** người tới lượt
+  **lật** 1 lá từ nọc, lá lật hiển thị công khai — "chỉ có thể ăn hoặc bỏ":
+  - **Người lật là cửa** của lá đó (được ăn rác/lẻ/đôi/khui/tới như §5.1).
+  - Người khác được **giành** (đôi/khui/tới) theo ưu tiên trên.
+  - **Không ai ăn** → lá bỏ ra bàn (đống rác công khai), **người bên phải người lật
+    lật tiếp** — không ai phải đánh rác trong chuỗi lật.
+  - Ai **ăn** lá (đánh ra hoặc lật) → phơi nhóm xuống chiếu, **chiếm lượt** và phải
+    **đánh trả 1 lá rác** vào cửa bên phải mình.
+- **Quằn hạ ngay (CHỐT):** có **4 lá giống nhau** (khui khi ăn HOẶC quằn có sẵn khi chia)
+  thì **hạ xuống chiếu ngay lập tức** thành quằn phơi; tới khi có quằn phơi = **tới quan**.
 - **Khui bắt buộc:** khi đang có **khạp** (3 lá giống nhau) mà lá thứ 4 xuất hiện
   (bị đánh hoặc tự lật), **bắt buộc phải khui** (hạ 4 lá xuống bàn) — trừ khi việc **Tới**
   được ưu tiên hơn (xem §7). Khạp **không được xé lẻ** để ăn như đôi.
@@ -199,13 +252,15 @@ Vòng **ngược chiều kim đồng hồ**. Mỗi lượt:
 
 ## 7. Ưu tiên khi nhiều người cùng muốn 1 lá
 
-Thứ tự ưu tiên: **Tới > Khạp (khui, bắt buộc) > Đôi (bắt buộc*) > tới lượt mới được ăn**.
+Thứ tự ưu tiên (chẵn trước, lẻ sau):
+**Tới > Khui (quằn, bắt buộc) > Đôi (khạp, bắt buộc*) > Ăn rác thành đôi (chỉ cửa) > Ăn lẻ/liền (chỉ cửa)**.
 
-- Nhiều người cùng **Tới**: ưu tiên theo **thứ tự lượt tính từ người đánh** (ngược chiều
-  kim đồng hồ). Vd A lật 1 con mà cả C và D cùng tới → **C tới** (đứng trước D).
+- Nhiều người cùng **Tới**: ưu tiên theo **thứ tự lượt tính từ người đánh/lật** (ngược
+  chiều kim đồng hồ). Vd A lật 1 con mà cả C và D cùng tới → **C tới** (đứng trước D).
 - **Khạp:** có thể chen lượt, **bắt buộc khui** trong mọi trường hợp (trừ khi được tới).
 - **Đôi:** bắt buộc đôi, **trừ khi đang chờ tới** thì được bỏ đôi (xem §8).
-- Ăn bằng **rác** (ghép lá lẻ): chỉ khi **tới lượt mình**.
+- Ăn bằng **rác** / **ăn lẻ**: chỉ người **đúng cửa** (kế bên phải người đánh; với lá
+  lật thì chính người lật là cửa) — người khác cửa không được dù có bộ chờ sẵn.
 
 ---
 

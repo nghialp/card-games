@@ -6,7 +6,13 @@ import {
   toCounts,
   type Tile,
 } from './tiles';
-import { detectMeld, isWinningHand, looseCount, type Meld } from './melds';
+import {
+  detectMeld,
+  isWinningHand,
+  looseCount,
+  looseCountHard,
+  type Meld,
+} from './melds';
 
 /**
  * Luật "ăn" khi có lá được đánh/lật (docs/tusac-rules.md §5–§8).
@@ -85,7 +91,15 @@ export function legalClaims(
 
   addLienCandidates(raw, counts, claimed);
 
-  let claims: Claim[] = raw.map((r) => {
+  // Khạp trên tay KHÔNG được xé (§5.1): nước nào lấy lá từ ô đang có ≥3 bản
+  // đều bị loại — trừ chính nước khui (quad) dùng trọn khạp đó.
+  const filtered = raw.filter(
+    (r) =>
+      r.kind === 'quad' ||
+      r.fromHand.every((t) => counts[cellOf(t.piece, t.color)] < 3),
+  );
+
+  let claims: Claim[] = filtered.map((r) => {
     const tiles = [...r.fromHand, claimed];
     return {
       kind: r.kind,
@@ -106,13 +120,34 @@ export function legalClaims(
 
   if (claims.length === 0) return [];
 
-  // Anti-rác: chỉ giữ nước để lại ÍT RÁC NHẤT (so trên toàn bộ nước có thể).
-  const loose = claims.map((cl) => looseCount(removeTiles(hand, cl.fromHand)));
-  const minLoose = Math.min(...loose);
-  claims = claims.filter((_, i) => loose[i] === minLoose);
-
-  // Ngoài lượt: chỉ được các nước giật (đôi/khạp).
+  // Anti-rác ba lớp:
+  // 1) TUYỆT ĐỐI: nước ăn không được để lại NHIỀU rác hơn hiện trạng tay bài
+  //    (vd đôi Sỹ + Tướng: xé Tướng+Sỹ ăn Tượng tạo 1 Sỹ rác → cấm).
+  // 2) TUYỆT ĐỐI "cứng" (Tướng-lẻ tính như rác) — chặn xé LIỀN để Tướng trơ ra
+  //    (vd liền T-S-Tg, lật Tướng: cấm dùng Sỹ+Tượng ăn). Chỉ áp cho nước ăn-ghép
+  //    (pair/lien); nước dùng TRỌN nhóm (đôi→khạp, khui) được miễn.
+  // 3) TƯƠNG ĐỐI: trong các nước còn lại, chỉ giữ nước để lại ÍT RÁC NHẤT.
+  const looseBefore = looseCount(hand);
+  const looseHardBefore = looseCountHard(hand);
+  claims = claims.filter((cl) => {
+    const rest = removeTiles(hand, cl.fromHand);
+    if (looseCount(rest) > looseBefore) return false;
+    if (
+      (cl.kind === 'pair' || cl.kind === 'lien') &&
+      looseCountHard(rest) > looseHardBefore
+    ) {
+      return false;
+    }
+    return true;
+  });
+  // Ngoài lượt (khác cửa): chỉ được các nước giật (đôi/khạp) — lọc TRƯỚC khi
+  // so "ít rác nhất", để nước giật không bị nước chỉ-dành-cho-cửa loại oan.
   if (!ctx.isOwnTurn) claims = claims.filter((cl) => cl.outOfTurn);
+  if (claims.length === 0) return [];
+
+  const looseLeft = claims.map((cl) => looseCount(removeTiles(hand, cl.fromHand)));
+  const minLoose = Math.min(...looseLeft);
+  claims = claims.filter((_, i) => looseLeft[i] === minLoose);
 
   return claims;
 }

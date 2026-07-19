@@ -3,7 +3,7 @@ import { Color, Piece, type Tile } from '../tiles';
 import { MatchError, TuSacMatch } from '../match';
 
 const t = (piece: Piece, color: Color): Tile => ({ piece, color });
-const { General, Advisor, Elephant, Chariot, Cannon } = Piece;
+const { General, Advisor, Elephant, Chariot, Cannon, Horse } = Piece;
 const { Red, Green, White } = Color;
 
 describe('TuSacMatch — luồng cơ bản', () => {
@@ -17,13 +17,41 @@ describe('TuSacMatch — luồng cơ bản', () => {
     expect(m.phase).toBe('finished');
   });
 
-  it('tự tới sau khi bốc', () => {
+  it('tới trên lá tự lật (lá lật công khai, tới qua cửa sổ ăn)', () => {
     const m = new TuSacMatch([[t(Cannon, Green)], [t(Chariot, Red)]], [t(Chariot, Red)]);
     m.discard(0, t(Cannon, Green));
     expect(m.turn).toBe(1);
-    m.draw(1); // bốc Xe đỏ → tay [Xe đỏ, Xe đỏ] = tròn
-    m.declareWin(1);
+    m.draw(1); // lật Xe đỏ (công khai) → seat1 có thể tới (đôi Xe)
+    expect(m.phase).toBe('awaiting-claims');
+    m.respondClaim(1, { type: 'win' });
     expect(m.result).toEqual({ kind: 'win', winner: 1, quan: false });
+  });
+
+  it('lá lật không ai ăn → vào đống rác, người kế lật tiếp', () => {
+    const m = new TuSacMatch(
+      [[t(Cannon, Green)], [t(Advisor, White)]],
+      [t(Elephant, Red), t(Chariot, Red)],
+    );
+    m.discard(0, t(Cannon, Green)); // không ai ăn → seat1 lật
+    expect(m.turn).toBe(1);
+    m.draw(1); // lật Tượng đỏ — không ai ăn được
+    // lá vào đống rác, KHÔNG vào tay seat1; lượt lật chuyển seat0
+    expect(m.publicState().discards.some((d) => d.piece === Elephant && d.color === Red)).toBe(
+      true,
+    );
+    expect(m.handOf(1)).toHaveLength(1);
+    expect(m.turn).toBe(0);
+    expect(m.phase).toBe('awaiting-draw');
+  });
+
+  it('nhà cái theo dealerSeat: cái đi trước', () => {
+    const m = new TuSacMatch(
+      [[t(Cannon, Green)], [t(Advisor, White), t(Chariot, Red)]],
+      [],
+      1,
+    );
+    expect(m.turn).toBe(1);
+    expect(m.phase).toBe('awaiting-discard');
   });
 });
 
@@ -107,6 +135,52 @@ describe('TuSacMatch — giật lá bốc & quằn tự nhiên', () => {
     expect(s0.melds).toHaveLength(1);
     expect(s0.melds[0]).toHaveLength(4); // quằn Xe đỏ đã hạ
     expect(s0.handCount).toBe(1); // còn Pháo xanh
+  });
+});
+
+describe('TuSacMatch — luật cửa (ăn rác/lẻ chỉ đúng cửa)', () => {
+  it('người đúng cửa được ăn rác thành đôi; người khác cửa thì không', () => {
+    // seat0 đánh Pháo xanh; seat1 (cửa) có 1 Pháo xanh rác; seat2 cũng có 1 Pháo xanh rác
+    const m = new TuSacMatch(
+      [
+        [t(Cannon, Green), t(Chariot, Red)],
+        [t(Cannon, Green), t(Advisor, White), t(Elephant, Red)],
+        [t(Cannon, Green), t(Elephant, White), t(Advisor, Red)],
+      ],
+      [],
+    );
+    m.discard(0, t(Cannon, Green));
+    const claimers = m.publicState().pendingClaimers;
+    expect(claimers).toContain(1); // cửa được ăn rác (pair)
+    expect(claimers).not.toContain(2); // khác cửa: 1 lá rác không giật được
+
+    m.respondClaim(1, { type: 'claim', tiles: [t(Cannon, Green)] });
+    expect(m.turn).toBe(1); // cửa ăn xong chiếm lượt, phải đánh trả
+    expect(m.phase).toBe('awaiting-discard');
+    expect(m.publicState().seats[1].melds[0]).toHaveLength(2); // đôi Pháo phơi
+  });
+
+  it('ăn lẻ (liền) chỉ đúng cửa; ưu tiên chẵn (đôi giật) hơn lẻ của cửa', () => {
+    // seat0 đánh Xe xanh. seat1 (cửa) có Pháo xanh + Mã xanh (ăn lẻ).
+    // seat2 có ĐÔI Xe xanh (giật thành khạp) → chẵn ưu tiên hơn lẻ.
+    const m = new TuSacMatch(
+      [
+        [t(Chariot, Green), t(Advisor, Red)],
+        [t(Cannon, Green), t(Horse, Green), t(Elephant, White)],
+        [t(Chariot, Green), t(Chariot, Green), t(Advisor, White), t(Elephant, Red)],
+      ],
+      [],
+    );
+    m.discard(0, t(Chariot, Green));
+    const claimers = m.publicState().pendingClaimers;
+    expect(claimers).toContain(1);
+    expect(claimers).toContain(2);
+
+    m.respondClaim(1, { type: 'claim', tiles: [t(Cannon, Green), t(Horse, Green)] });
+    m.respondClaim(2, { type: 'claim', tiles: [t(Chariot, Green), t(Chariot, Green)] });
+    // chẵn (triple của seat2) thắng lẻ (lien của seat1)
+    expect(m.turn).toBe(2);
+    expect(m.publicState().seats[2].melds[0]).toHaveLength(3);
   });
 });
 

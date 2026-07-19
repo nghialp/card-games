@@ -1,15 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   canWin,
   isTenpai,
   isWinningHand,
   legalClaims,
+  maxMeldCover,
   sameTile,
   type Claim,
   type Tile,
 } from '@card-games/game-tusac';
 import type { TuSacSeat } from '@card-games/types';
 import { TuSacTileView, tusacTileLabel } from '../components/TuSacTileView';
+import { TurnTimer } from '../components/TurnTimer';
+import { tryLockLandscape, unlockOrientation } from '../lib/orientation';
 import { getUserId } from '../lib/socket';
 import { useAuth } from '../store/auth';
 import { seatOf, useTusac } from '../store/tusac';
@@ -76,6 +79,20 @@ function OpponentSeat({
   );
 }
 
+/** Đánh dấu các chỉ số lá trên tay khớp multiset `tiles` (mỗi lá dùng 1 lần) */
+function markIndices(hand: readonly Tile[], tiles: readonly Tile[]): Set<number> {
+  const marked = new Set<number>();
+  const rest = [...tiles];
+  hand.forEach((h, i) => {
+    const j = rest.findIndex((t) => sameTile(t, h));
+    if (j !== -1) {
+      rest.splice(j, 1);
+      marked.add(i);
+    }
+  });
+  return marked;
+}
+
 export function TuSacRoom() {
   const room = useTusac((s) => s.room)!;
   const hand = useTusac((s) => s.hand);
@@ -89,7 +106,8 @@ export function TuSacRoom() {
   const me = room.players.find((p) => p.userId === getUserId());
   const playing = room.status === 'playing' && !!match;
   const myTurn = playing && match!.turn === seat;
-  const [claimBusy, setClaimBusy] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [claimSel, setClaimSel] = useState<Claim | null>(null);
 
   // Cửa sổ ăn: mình có trong danh sách chờ phản hồi?
   const claiming =
@@ -99,25 +117,71 @@ export function TuSacRoom() {
   const claimInfo = useMemo(() => {
     if (!claiming || !pendingTile) return null;
     const claims = legalClaims(hand, pendingTile, {
-      isOwnTurn: false,
+      // "đúng cửa" mới được ăn rác/ăn lẻ — tính giống engine
+      isOwnTurn: match!.pending!.gate === seat,
       waitingToWin: isTenpai(hand),
     });
     const win = canWin(hand, pendingTile);
     const forced = !win && claims.some((c) => c.mandatory);
     return { claims, win, forced };
-  }, [claiming, pendingTile, hand]);
+  }, [claiming, pendingTile, hand, match, seat]);
 
-  const handWinning = useMemo(
-    () => playing && myTurn && match!.phase === 'awaiting-discard' && isWinningHand(hand),
-    [playing, myTurn, match, hand],
+  // Tự chọn sẵn khi chỉ có đúng 1 nước ăn (thường là khui/đôi bắt buộc)
+  useEffect(() => {
+    setClaimSel(claimInfo?.claims.length === 1 ? claimInfo.claims[0] : null);
+  }, [claimInfo]);
+
+  // Mobile: cố gắng khoá màn hình ngang khi ở trong bàn
+  useEffect(() => {
+    tryLockLandscape();
+    return unlockOrientation;
+  }, []);
+
+  // Lá được chọn trong nhóm ăn (đánh dấu theo chỉ số vì có lá trùng nhau)
+  const claimSelIdx = useMemo(
+    () => (claimSel ? markIndices(hand, claimSel.fromHand) : new Set<number>()),
+    [claimSel, hand],
   );
 
-  const respondAnd = async (fn: () => Promise<void>) => {
-    setClaimBusy(true);
+  const discardPhase = playing && myTurn && match!.phase === 'awaiting-discard';
+  const handWinning = useMemo(
+    () => discardPhase && isWinningHand(hand),
+    [discardPhase, hand],
+  );
+
+  // Khi đánh rác: chỉ các lá RÁC được chọn (bỏ đi không làm vỡ nhóm)
+  const discardable = useMemo(() => {
+    if (!discardPhase) return new Set<number>();
+    const full = maxMeldCover(hand);
+    const ok = new Set<number>();
+    hand.forEach((_, i) => {
+      const rest = hand.slice(0, i).concat(hand.slice(i + 1));
+      if (maxMeldCover(rest) === full) ok.add(i);
+    });
+    // phòng hờ: không tìm được rác (không xảy ra khi chưa tròn) → cho chọn tất cả
+    return ok.size > 0 ? ok : new Set(hand.map((_, i) => i));
+  }, [discardPhase, hand]);
+
+  const onTileClick = (tile: Tile, index: number): void => {
+    if (claiming && claimInfo) {
+      // click lá hợp lệ → chọn cả nhóm ăn chứa lá đó (click lần nữa → đổi nhóm khác)
+      const options = claimInfo.claims.filter((c) =>
+        c.fromHand.some((t) => sameTile(t, tile)),
+      );
+      if (options.length === 0) return;
+      const cur = options.findIndex((c) => c === claimSel);
+      setClaimSel(options[(cur + 1) % options.length]);
+      return;
+    }
+    if (discardPhase && discardable.has(index)) select(tile);
+  };
+
+  const doRespond = async (fn: () => Promise<void>): Promise<void> => {
+    setBusy(true);
     try {
       await fn();
     } finally {
-      setClaimBusy(false);
+      setBusy(false);
     }
   };
 
@@ -126,6 +190,15 @@ export function TuSacRoom() {
     const target = (seat + i + 1) % room.maxPlayers;
     return room.players.find((p) => p.seat === target) ?? null;
   });
+
+  const claimableIdx = useMemo(() => {
+    if (!claiming || !claimInfo) return new Set<number>();
+    const all = new Set<number>();
+    for (const c of claimInfo.claims) {
+      for (const i of markIndices(hand, c.fromHand)) all.add(i);
+    }
+    return all;
+  }, [claiming, claimInfo, hand]);
 
   return (
     <div className="room">
@@ -164,6 +237,14 @@ export function TuSacRoom() {
                   </span>
                 </div>
               )}
+              {match!.endsAt ? <TurnTimer endsAt={match!.endsAt} /> : null}
+              {match!.discards.length > 0 && (
+                <div className="ts-discards" title="Đống rác (không ai ăn)">
+                  {(match!.discards as Tile[]).slice(-8).map((tile, i) => (
+                    <TuSacTileView key={i} tile={tile} size="small" />
+                  ))}
+                </div>
+              )}
             </>
           )}
           {!playing && (
@@ -177,14 +258,25 @@ export function TuSacRoom() {
           {me && <MeldRow melds={(me.melds as Tile[][]) ?? []} />}
 
           <div className="ts-hand">
-            {hand.map((tile, i) => (
-              <TuSacTileView
-                key={`${tile.piece}-${tile.color}-${i}`}
-                tile={tile}
-                selected={!!selected && sameTile(selected, tile)}
-                onClick={playing ? () => select(tile) : undefined}
-              />
-            ))}
+            {hand.map((tile, i) => {
+              const inClaimMode = claiming && !!claimInfo;
+              const clickable = inClaimMode
+                ? claimableIdx.has(i)
+                : discardPhase && discardable.has(i);
+              const dim = (inClaimMode || discardPhase) && !clickable;
+              const isSel = inClaimMode
+                ? claimSelIdx.has(i)
+                : !!selected && sameTile(selected, tile) && discardable.has(i);
+              return (
+                <div key={`${tile.piece}-${tile.color}-${i}`} className={dim ? 'ts-slot--dim' : ''}>
+                  <TuSacTileView
+                    tile={tile}
+                    selected={isSel}
+                    onClick={clickable ? () => onTileClick(tile, i) : undefined}
+                  />
+                </div>
+              );
+            })}
           </div>
 
           <div className="controls">
@@ -199,11 +291,11 @@ export function TuSacRoom() {
 
             {playing && myTurn && match!.phase === 'awaiting-draw' && (
               <button className="btn btn--primary" onClick={() => void draw()}>
-                🂠 Bốc bài
+                🂠 Lật bài
               </button>
             )}
 
-            {playing && myTurn && match!.phase === 'awaiting-discard' && (
+            {discardPhase && (
               <>
                 {handWinning && (
                   <button className="btn btn--primary" onClick={() => void declareWin()}>
@@ -215,52 +307,52 @@ export function TuSacRoom() {
                   disabled={!selected}
                   onClick={() => void discardSelected()}
                 >
-                  Đánh{selected ? ` ${tusacTileLabel(selected)}` : ''}
+                  Đánh{selected ? ` ${tusacTileLabel(selected)}` : ' (chọn 1 lá rác)'}
+                </button>
+              </>
+            )}
+
+            {claiming && claimInfo && (
+              <>
+                {claimInfo.win && (
+                  <button
+                    className="btn btn--primary"
+                    disabled={busy}
+                    onClick={() => void doRespond(() => respond({ type: 'win' }))}
+                  >
+                    🏆 Tới!
+                  </button>
+                )}
+                <button
+                  className="btn btn--primary"
+                  disabled={busy || !claimSel}
+                  onClick={() =>
+                    claimSel &&
+                    void doRespond(() => respond({ type: 'claim', tiles: claimSel.fromHand }))
+                  }
+                >
+                  {claimSel
+                    ? `${CLAIM_LABELS[claimSel.kind]} ${tusacTileLabel(pendingTile!)}${claimSel.mandatory ? ' (bắt buộc)' : ''}`
+                    : 'Chọn lá để ăn'}
+                </button>
+                <button
+                  className="btn"
+                  disabled={busy || claimInfo.forced}
+                  title={claimInfo.forced ? 'Bắt buộc phải ăn (khui/đôi)' : undefined}
+                  onClick={() => void doRespond(() => respond({ type: 'pass' }))}
+                >
+                  Bỏ qua
                 </button>
               </>
             )}
           </div>
         </div>
+      </div>
 
-        {claimInfo && pendingTile && (
-          <div className="ts-claim-panel">
-            <div className="ts-claim-panel__title">
-              Bạn có thể ăn <strong>{tusacTileLabel(pendingTile)}</strong>
-            </div>
-            <div className="ts-claim-panel__actions">
-              {claimInfo.win && (
-                <button
-                  className="btn btn--primary"
-                  disabled={claimBusy}
-                  onClick={() => void respondAnd(() => respond({ type: 'win' }))}
-                >
-                  🏆 Tới!
-                </button>
-              )}
-              {claimInfo.claims.map((c, i) => (
-                <button
-                  key={i}
-                  className="btn btn--primary"
-                  disabled={claimBusy}
-                  onClick={() =>
-                    void respondAnd(() => respond({ type: 'claim', tiles: c.fromHand }))
-                  }
-                >
-                  {CLAIM_LABELS[c.kind]} ({c.fromHand.map(tusacTileLabel).join(' + ')})
-                  {c.mandatory ? ' *' : ''}
-                </button>
-              ))}
-              <button
-                className="btn"
-                disabled={claimBusy || claimInfo.forced}
-                title={claimInfo.forced ? 'Bắt buộc phải ăn (khui/đôi)' : undefined}
-                onClick={() => void respondAnd(() => respond({ type: 'pass' }))}
-              >
-                Bỏ qua
-              </button>
-            </div>
-          </div>
-        )}
+      {/* Mobile cầm dọc: nhắc xoay ngang (web không ép xoay được ngoài fullscreen) */}
+      <div className="rotate-hint">
+        <span className="rotate-hint__icon">📱↻</span>
+        Xoay ngang màn hình để chơi
       </div>
 
       {result && (

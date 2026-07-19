@@ -123,13 +123,13 @@ async function act(bot: Bot, st: TuSacMatchState): Promise<void> {
         return;
       }
       const claims = legalClaims(bot.hand, tile, {
-        isOwnTurn: false,
+        isOwnTurn: st.pending!.gate === bot.seat, // "đúng cửa" mới ăn được rác/lẻ
         waitingToWin: isTenpai(bot.hand),
       });
-      const mand = claims.find((c) => c.mandatory);
+      const pick = claims.find((c) => c.mandatory) ?? claims[0];
       await emitAck(bot.socket, 'tusac:respond', {
         roomId,
-        response: mand ? { type: 'claim', tiles: mand.fromHand as TuSacTile[] } : { type: 'pass' },
+        response: pick ? { type: 'claim', tiles: pick.fromHand as TuSacTile[] } : { type: 'pass' },
       });
     }
   } catch (err) {

@@ -40,12 +40,16 @@ interface Room {
   id: string;
   betAmount: number;
   hostId: string;
+  /** Nhà cái: ván đầu là người vào trước; ván sau là người vừa tới (§3) */
+  dealerUserId: string;
   status: 'waiting' | 'playing' | 'finished';
   players: Player[];
   match: TuSacMatch | null;
   matchStartedAt: number;
   turnTimer: NodeJS.Timeout | null;
   claimTimer: NodeJS.Timeout | null;
+  /** Unix ms — hạn chót phase hiện tại (đếm ngược phía client) */
+  deadline: number;
 }
 
 const MAX_PLAYERS = 4;
@@ -75,12 +79,14 @@ export class TuSacService {
       id: randomUUID().slice(0, 8),
       betAmount,
       hostId: user.userId,
+      dealerUserId: user.userId, // vào phòng trước = cầm cái ván đầu
       status: 'waiting',
       players: [],
       match: null,
       matchStartedAt: 0,
       turnTimer: null,
       claimTimer: null,
+      deadline: 0,
     };
     this.rooms.set(room.id, room);
     this.addPlayer(room, user, socketId);
@@ -161,12 +167,23 @@ export class TuSacService {
   // ── Vòng đời ván ─────────────────────────────────────────
 
   private startMatch(room: Room): void {
+    // Dồn ghế liên tục 0..n-1 (có thể thủng sau khi người rời phòng chờ)
+    room.players.sort((a, b) => a.seat - b.seat);
+    room.players.forEach((p, i) => (p.seat = i));
+
+    // Nhà cái: người vào trước (ván đầu) / người vừa tới (ván sau)
+    let dealerSeat = room.players.findIndex((p) => p.userId === room.dealerUserId);
+    if (dealerSeat === -1) {
+      dealerSeat = 0;
+      room.dealerUserId = room.players[0].userId;
+    }
+
     const rng = (max: number): number => randomInt(max);
-    const { hands, pile } = deal(shuffle(createDeck(), rng), room.players.length);
-    room.match = new TuSacMatch(hands, pile);
+    const { hands, pile } = deal(shuffle(createDeck(), rng), room.players.length, dealerSeat);
+    room.match = new TuSacMatch(hands, pile, dealerSeat);
     room.matchStartedAt = Date.now();
     room.status = 'playing';
-    this.logger.log(`tusac match started in room ${room.id}`);
+    this.logger.log(`tusac match started in room ${room.id} (dealer seat ${dealerSeat})`);
     this.advance(room);
   }
 
@@ -175,6 +192,13 @@ export class TuSacService {
     this.clearTimers(room);
     const m = room.match;
     if (!m) return;
+    // Hạn chót phase hiện tại — client hiển thị đếm ngược
+    room.deadline =
+      m.phase === 'awaiting-claims'
+        ? Date.now() + CLAIM_MS
+        : m.phase === 'finished'
+          ? 0
+          : Date.now() + TURN_MS;
     // Gửi bài riêng TRƯỚC state để client xử lý state với bài mới nhất
     this.broadcastRoom(room);
     this.sendHands(room);
@@ -222,12 +246,13 @@ export class TuSacService {
     try {
       let guard = 0;
       while (m.phase === 'awaiting-claims' && guard++ < MAX_PLAYERS + 1) {
-        const seat = m.publicState().pendingClaimers[0];
+        const st = m.publicState();
+        const seat = st.pendingClaimers[0];
         if (seat === undefined) break;
-        const tile = m.publicState().pending!.tile as Tile;
+        const tile = st.pending!.tile as Tile;
         const hand = m.handOf(seat);
         const claims = legalClaims(hand, tile, {
-          isOwnTurn: false,
+          isOwnTurn: seat === st.pending!.gate,
           waitingToWin: isTenpai(hand),
         });
         const mand = claims.find((c) => c.mandatory);
@@ -255,6 +280,9 @@ export class TuSacService {
     if (res.kind === 'win' && res.winner !== undefined) {
       winnerSeat = res.winner;
       quan = !!res.quan;
+      // Ai tới thì ván sau cầm cái (§3)
+      const winner = bySeat.get(res.winner);
+      if (winner) room.dealerUserId = winner.userId;
       const seats = m.publicState().seats;
       const winnerTiles = [
         ...m.handOf(res.winner),
@@ -341,6 +369,13 @@ export class TuSacService {
         this.broadcastRoom(room);
         continue;
       }
+      // Nhà cái rời phòng → người kế (bên phải) cầm cái (§3)
+      if (room.dealerUserId === userId) {
+        const sorted = [...room.players].sort((a, b) => a.seat - b.seat);
+        const idx = sorted.findIndex((p) => p.userId === userId);
+        const next = sorted[(idx + 1) % sorted.length];
+        if (next && next.userId !== userId) room.dealerUserId = next.userId;
+      }
       room.players = room.players.filter((p) => p.userId !== userId);
       if (room.players.length === 0) {
         this.clearTimers(room);
@@ -385,6 +420,8 @@ export class TuSacService {
       pileCount: s.pileCount,
       pending: s.pending as never,
       pendingClaimers: s.pendingClaimers,
+      discards: s.discards as TuSacTile[],
+      endsAt: room.deadline || undefined,
     });
   }
 

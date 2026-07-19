@@ -39,12 +39,13 @@ function playOut(m: TuSacMatch, cap = 4000): number {
       const hand = m.handOf(seat);
       const cw = canWin(hand, tile);
       const claims = legalClaims(hand, tile, {
-        isOwnTurn: false,
+        isOwnTurn: seat === st.pending!.gate,
         waitingToWin: isTenpai(hand),
       });
       const mand = claims.find((c) => c.mandatory);
       if (cw) m.respondClaim(seat, { type: 'win' });
       else if (mand) m.respondClaim(seat, { type: 'claim', tiles: mand.fromHand });
+      else if (claims.length > 0) m.respondClaim(seat, { type: 'claim', tiles: claims[0].fromHand });
       else m.respondClaim(seat, { type: 'pass' });
     }
   }

@@ -37,9 +37,19 @@ export interface TuSacMatchState {
   phase: TuSacPhase;
   turn: number;
   pileCount: number;
-  pending: { tile: TuSacTile; from: number; kind: 'discard' | 'draw' } | null;
+  pending: {
+    tile: TuSacTile;
+    from: number;
+    kind: 'discard' | 'draw';
+    /** Ghế "đúng cửa" — duy nhất được ăn rác/ăn lẻ với lá này */
+    gate: number;
+  } | null;
   /** Ghế đang được chờ phản hồi ăn/giật */
   pendingClaimers: number[];
+  /** Đống rác công khai (lá không ai ăn), mới nhất cuối mảng */
+  discards: TuSacTile[];
+  /** Unix ms — hạn chót của phase hiện tại (lượt/cửa sổ ăn), client đếm ngược */
+  endsAt?: number;
 }
 
 export type TuSacResponse =

@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { verifyAccessToken } from '@shared-libs/auth';
 import { MatchError } from '@card-games/game-tienlen';
+import { MatchError as TuSacMatchError } from '@card-games/game-tusac';
 import type {
   Card,
   ClientToServerEvents,
@@ -334,7 +335,12 @@ export class GameGateway
   }
 
   private toAckError(err: unknown): { ok: false; error: string } {
-    if (err instanceof RoomError || err instanceof MatchError || err instanceof TuSacError) {
+    if (
+      err instanceof RoomError ||
+      err instanceof MatchError ||
+      err instanceof TuSacError ||
+      err instanceof TuSacMatchError
+    ) {
       return { ok: false, error: err.message };
     }
     this.logger.error('unexpected gateway error', err);

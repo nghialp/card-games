@@ -96,7 +96,7 @@ function canPartition(counts: Counts, memo: Map<string, boolean>): boolean {
 
 /** Số lá tối đa có thể gom vào các NHÓM HOÀN CHỈNH (§4); phần còn lại là "rác". */
 export function maxMeldCover(tiles: readonly Tile[]): number {
-  return coverCounts(toCounts(tiles), new Map());
+  return coverCounts(toCounts(tiles), new Map(), true);
 }
 
 /** Số lá "rác" tối thiểu (không vào được nhóm hoàn chỉnh nào). */
@@ -104,7 +104,19 @@ export function looseCount(tiles: readonly Tile[]): number {
   return tiles.length - maxMeldCover(tiles);
 }
 
-function coverCounts(counts: Counts, memo: Map<string, number>): number {
+/**
+ * Như looseCount nhưng KHÔNG tính Tướng-lẻ là nhóm — dùng để phát hiện nước ăn
+ * "xé liền để Tướng trơ ra" (§5.1: liền không được xé).
+ */
+export function looseCountHard(tiles: readonly Tile[]): number {
+  return tiles.length - coverCounts(toCounts(tiles), new Map(), false);
+}
+
+function coverCounts(
+  counts: Counts,
+  memo: Map<string, number>,
+  allowGeneralSingle: boolean,
+): number {
   const key = counts.join(',');
   const cached = memo.get(key);
   if (cached !== undefined) return cached;
@@ -114,14 +126,16 @@ function coverCounts(counts: Counts, memo: Map<string, number>): number {
 
   // Phương án 1: bỏ lá này làm rác (phủ 0)
   counts[cell] -= 1;
-  let best = coverCounts(counts, memo);
+  let best = coverCounts(counts, memo, allowGeneralSingle);
   counts[cell] += 1;
 
   // Phương án 2: gom lá này vào một nhóm hoàn chỉnh
   for (const delta of meldDeltas(counts, pieceOfCell(cell), colorOfCell(cell))) {
+    // Nhóm "Tướng lẻ" (1 lá) chỉ tính khi được phép
     const size = delta.reduce((s, [, amt]) => s + amt, 0);
+    if (size === 1 && !allowGeneralSingle) continue;
     applyDelta(counts, delta, -1);
-    best = Math.max(best, size + coverCounts(counts, memo));
+    best = Math.max(best, size + coverCounts(counts, memo, allowGeneralSingle));
     applyDelta(counts, delta, +1);
   }
 

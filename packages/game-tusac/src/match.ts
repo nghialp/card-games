@@ -4,13 +4,18 @@ import { canWin, isTenpai, legalClaims, type Claim } from './claims';
 
 /**
  * State machine một ván Tứ Sắc — thuần logic, không timer/IO
- * (docs/tusac-rules.md §5–§9). Server bọc ngoài để xử socket + đồng hồ.
+ * (docs/tusac-rules.md §5–§9, đã cập nhật theo tusac-bosung.md).
  *
- * - Cửa sổ giật/ăn mở trên **lá đánh ra** VÀ **lá bốc từ nọc** (§5.1): khi ai đó
- *   lật bài, người chưa tới lượt vẫn được giật (đôi/khạp/tới); lá tự chuyển sang
- *   người giật.
- * - 4 lá giống nhau (khui khi ăn HOẶC quằn có sẵn/bốc được) được **hạ ngay** thành
- *   quằn phơi ra bàn; tới khi có quằn phơi = **tới quan**.
+ * Luật cửa & lá lật:
+ * - Lá đánh ra thuộc **cửa** người kế bên phải người đánh; lá lật từ nọc thì
+ *   **người lật là cửa**. Chỉ cửa được ăn rác (pair) / ăn lẻ (lien); người khác
+ *   giành bằng đôi (khạp) / khui (quằn) / tới.
+ * - Lá lật **công khai, không vào tay**: không ai ăn → bỏ vào đống rác, người
+ *   bên phải người lật lật tiếp.
+ * - Ai ăn → phơi nhóm, chiếm lượt, phải đánh trả 1 rác.
+ * - Ưu tiên: tới > khui > đôi > ăn rác (cửa) > ăn lẻ (cửa); đồng hạng → gần
+ *   người đánh hơn.
+ * - Quằn (4 lá giống nhau) hạ chiếu ngay; tới có quằn phơi = tới quan.
  */
 
 export type MatchPhase =
@@ -32,8 +37,16 @@ export interface SeatView {
 export interface MatchResult {
   kind: 'win' | 'draw';
   winner?: number;
-  /** Tới quan (người thắng có quằn đã hạ bàn) */
+  /** Tới quan (người thắng có quằn đã hạ chiếu) */
   quan?: boolean;
+}
+
+export interface PendingTile {
+  tile: Tile;
+  from: number;
+  kind: 'discard' | 'draw';
+  /** Ghế "đúng cửa" — duy nhất được ăn rác/ăn lẻ với lá này */
+  gate: number;
 }
 
 export interface MatchPublicState {
@@ -41,8 +54,10 @@ export interface MatchPublicState {
   turn: number;
   seats: SeatView[];
   pileCount: number;
-  pending: { tile: Tile; from: number; kind: 'discard' | 'draw' } | null;
+  pending: PendingTile | null;
   pendingClaimers: number[];
+  /** Đống rác công khai (lá không ai ăn), mới nhất cuối mảng */
+  discards: Tile[];
   result: MatchResult | null;
 }
 
@@ -60,16 +75,24 @@ interface Eligible {
   forced: boolean;
 }
 
-const CLAIM_PRIORITY: Record<string, number> = { win: 0, quad: 1, triple: 2 };
+/** Ưu tiên: tới > khui > đôi > ăn rác (cửa) > ăn lẻ (cửa) — §7 */
+const CLAIM_PRIORITY: Record<string, number> = {
+  win: 0,
+  quad: 1,
+  triple: 2,
+  pair: 3,
+  lien: 4,
+};
 
 export class TuSacMatch {
   private readonly hands: Tile[][];
   private readonly melds: Tile[][][];
   private readonly pile: Tile[];
+  private readonly discardPile: Tile[] = [];
   private readonly n: number;
   private turnSeat: number;
   private phaseState: MatchPhase;
-  private pending: { tile: Tile; from: number; kind: 'discard' | 'draw' } | null = null;
+  private pending: PendingTile | null = null;
   private resultState: MatchResult | null = null;
 
   private eligible: Eligible[] = [];
@@ -78,18 +101,20 @@ export class TuSacMatch {
     null;
 
   /**
-   * @param hands hands[0] = nhà cái (21 lá, đánh trước); còn lại 20 lá
-   * @param pile  nọc
+   * @param hands      hands[dealerSeat] = nhà cái (21 lá, đánh trước); còn lại 20 lá
+   * @param pile       nọc
+   * @param dealerSeat ghế nhà cái (mặc định 0)
    */
-  constructor(hands: Tile[][], pile: Tile[]) {
+  constructor(hands: Tile[][], pile: Tile[], dealerSeat = 0) {
     if (hands.length < 2 || hands.length > 4) throw new Error('need 2-4 players');
+    if (dealerSeat < 0 || dealerSeat >= hands.length) throw new Error('invalid dealerSeat');
     this.hands = hands.map((h) => [...h]);
     this.melds = hands.map(() => []);
     this.pile = [...pile];
     this.n = hands.length;
-    // Quằn có sẵn khi chia → hạ ngay
+    // Quằn có sẵn khi chia → hạ chiếu ngay
     for (let s = 0; s < this.n; s++) this.autoLayQuan(s);
-    this.turnSeat = 0; // cái đi trước
+    this.turnSeat = dealerSeat; // cái đi trước
     this.phaseState = 'awaiting-discard';
   }
 
@@ -119,13 +144,14 @@ export class TuSacMatch {
       pendingClaimers: this.eligible
         .filter((e) => !this.responded.has(e.seat))
         .map((e) => e.seat),
+      discards: [...this.discardPile],
       result: this.resultState,
     };
   }
 
   // ── Hành động ─────────────────────────────────────────────
 
-  /** Bốc 1 lá (lật). Nọc hết → hoà. Người khác có thể giật lá lật. */
+  /** Lật 1 lá từ nọc (công khai — không vào tay). Nọc hết → hoà. */
   draw(seat: number): void {
     this.expect('awaiting-draw', seat);
     if (this.pile.length === 0) {
@@ -133,23 +159,27 @@ export class TuSacMatch {
       return;
     }
     const tile = this.pile.shift()!;
-    this.openWindow(tile, seat, 'draw');
+    // Người lật là cửa của lá lật
+    this.openWindow(tile, seat, 'draw', seat);
   }
 
-  /** Tự tới (tay bài đã tròn). */
+  /** Tự tới (tay bài đã tròn) — được cả trước khi lật lẫn sau khi ăn. */
   declareWin(seat: number): void {
-    this.expect('awaiting-discard', seat);
+    if (this.phaseState !== 'awaiting-draw' && this.phaseState !== 'awaiting-discard') {
+      throw new MatchError('WRONG_PHASE');
+    }
+    if (seat !== this.turnSeat) throw new MatchError('NOT_YOUR_TURN');
     if (!isWinningHand(this.hands[seat])) throw new MatchError('NOT_WINNING');
     this.win(seat);
   }
 
-  /** Đánh ra 1 lá → mở cửa sổ ăn cho người khác. */
+  /** Đánh ra 1 lá → mở cửa sổ ăn (cửa = người kế bên phải). */
   discard(seat: number, tile: Tile): void {
     this.expect('awaiting-discard', seat);
     const idx = this.hands[seat].findIndex((t) => sameTile(t, tile));
     if (idx === -1) throw new MatchError('NOT_IN_HAND');
     this.hands[seat].splice(idx, 1);
-    this.openWindow(tile, seat, 'discard');
+    this.openWindow(tile, seat, 'discard', (seat + 1) % this.n);
   }
 
   /** Phản hồi cửa sổ giật/ăn (pass / win / claim). */
@@ -182,13 +212,15 @@ export class TuSacMatch {
 
   // ── Nội bộ ────────────────────────────────────────────────
 
-  private openWindow(tile: Tile, from: number, kind: 'discard' | 'draw'): void {
+  private openWindow(tile: Tile, from: number, kind: 'discard' | 'draw', gate: number): void {
     const eligible: Eligible[] = [];
-    for (let step = 1; step < this.n; step++) {
+    for (let step = 0; step < this.n; step++) {
       const seat = (from + step) % this.n;
+      // lá đánh ra: người đánh không được ăn lại lá mình; lá lật: người lật tham gia
+      if (kind === 'discard' && seat === from) continue;
       const cw = canWin(this.hands[seat], tile);
       const claims = legalClaims(this.hands[seat], tile, {
-        isOwnTurn: false,
+        isOwnTurn: seat === gate,
         waitingToWin: isTenpai(this.hands[seat]),
       });
       if (cw || claims.length > 0) {
@@ -196,22 +228,12 @@ export class TuSacMatch {
       }
     }
 
-    // Lá bốc: nếu không ai giật được → người bốc giữ lá luôn.
-    if (kind === 'draw' && eligible.length === 0) {
-      this.keepDrawnTile(from, tile);
-      return;
-    }
-    // Lá bốc + có người giật: người bốc được tự tới (ưu tiên cao nhất, dist 0).
-    if (kind === 'draw' && canWin(this.hands[from], tile)) {
-      eligible.unshift({ seat: from, canWin: true, claims: [], forced: false });
-    }
-    // Lá đánh ra mà không ai ăn → sang người kế tiếp.
     if (eligible.length === 0) {
-      this.advanceTurn();
+      this.dropAndAdvance(tile, from, kind);
       return;
     }
 
-    this.pending = { tile: { ...tile }, from, kind };
+    this.pending = { tile: { ...tile }, from, kind, gate };
     this.eligible = eligible;
     this.responded.clear();
     this.best = null;
@@ -237,8 +259,7 @@ export class TuSacMatch {
   private resolveWindow(): void {
     const pending = this.pending!;
     if (!this.best) {
-      if (pending.kind === 'draw') this.keepDrawnTile(pending.from, pending.tile);
-      else this.advanceTurn();
+      this.dropAndAdvance(pending.tile, pending.from, pending.kind);
       return;
     }
     const { seat, response } = this.best;
@@ -246,7 +267,7 @@ export class TuSacMatch {
       this.win(seat); // 'win' — nhánh 'pass' không bao giờ lưu vào best
       return;
     }
-    // Giật/ăn: lấy lá vào nhóm phơi, chiếm lượt, phải đánh ra.
+    // Ăn: lấy lá vào nhóm phơi, chiếm lượt, phải đánh trả 1 rác.
     const claim = this.matchClaim(this.eligible.find((x) => x.seat === seat)!, response.tiles)!;
     for (const t of claim.fromHand) {
       const i = this.hands[seat].findIndex((h) => sameTile(h, t));
@@ -259,25 +280,21 @@ export class TuSacMatch {
     this.clearWindow();
   }
 
-  /** Người bốc giữ lá vào tay (khi không ai giật) rồi hạ quằn nếu đủ 4. */
-  private keepDrawnTile(seat: number, tile: Tile): void {
-    this.hands[seat].push({ ...tile });
-    this.autoLayQuan(seat);
-    this.turnSeat = seat;
-    this.phaseState = 'awaiting-discard';
+  /** Không ai ăn: lá vào đống rác công khai; người kế của from lật tiếp. */
+  private dropAndAdvance(tile: Tile, from: number, kind: 'discard' | 'draw'): void {
+    this.discardPile.push({ ...tile });
+    this.turnSeat = (from + 1) % this.n;
+    this.phaseState = 'awaiting-draw';
     this.clearWindow();
+    void kind;
   }
 
-  /** Hạ mọi bộ 4 lá giống nhau trong tay thành quằn phơi ra bàn (§ tới quan). */
+  /** Hạ mọi bộ 4 lá giống nhau trong tay thành quằn phơi ra chiếu. */
   private autoLayQuan(seat: number): void {
-    let done = false;
-    while (!done) {
+    for (;;) {
       const counts = toCounts(this.hands[seat]);
       const cell = counts.findIndex((c) => c >= 4);
-      if (cell === -1) {
-        done = true;
-        break;
-      }
+      if (cell === -1) break;
       const piece = pieceOfCell(cell);
       const color = colorOfCell(cell);
       const quan: Tile[] = [];
@@ -287,12 +304,6 @@ export class TuSacMatch {
       }
       this.melds[seat].push(quan);
     }
-  }
-
-  private advanceTurn(): void {
-    this.turnSeat = (this.turnSeat + 1) % this.n;
-    this.phaseState = 'awaiting-draw';
-    this.clearWindow();
   }
 
   private clearWindow(): void {

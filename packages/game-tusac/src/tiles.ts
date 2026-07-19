@@ -96,23 +96,28 @@ export function shuffle(deck: readonly Tile[], rng: Rng): Tile[] {
 }
 
 export interface Dealt {
-  /** hands[0] là nhà cái (21 lá); còn lại 20 lá */
+  /** hands[dealerSeat] là nhà cái (21 lá); còn lại 20 lá */
   hands: Tile[][];
-  /** Phần còn lại làm nọc (draw pile) */
+  /** Phần còn lại làm nọc (draw pile / tỳ) */
   pile: Tile[];
 }
 
 /**
- * Chia bài: nhà cái (ghế 0) 21 lá, người khác 20 lá, phần dư làm nọc.
+ * Chia bài: nhà cái (dealerSeat) 21 lá, người khác 20 lá, phần dư làm nọc.
  * numPlayers 2–4.
  */
-export function deal(deck: readonly Tile[], numPlayers: number): Dealt {
+export function deal(
+  deck: readonly Tile[],
+  numPlayers: number,
+  dealerSeat = 0,
+): Dealt {
   if (numPlayers < 2 || numPlayers > 4) throw new Error('numPlayers must be 2..4');
+  if (dealerSeat < 0 || dealerSeat >= numPlayers) throw new Error('invalid dealerSeat');
   const tiles = [...deck];
   let idx = 0;
   const hands: Tile[][] = [];
   for (let seat = 0; seat < numPlayers; seat++) {
-    const size = seat === 0 ? 21 : 20;
+    const size = seat === dealerSeat ? 21 : 20;
     hands.push(tiles.slice(idx, idx + size));
     idx += size;
   }

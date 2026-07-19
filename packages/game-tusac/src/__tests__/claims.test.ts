@@ -98,6 +98,77 @@ describe('legalClaims — liền', () => {
   });
 });
 
+describe('legalClaims — khạp không được xé (§5.1)', () => {
+  it('có khạp 3 Xe, ăn Xe → CHỈ được khui (không pair/triple)', () => {
+    const hand = [t(Chariot, Red), t(Chariot, Red), t(Chariot, Red)];
+    const cl = legalClaims(hand, t(Chariot, Red), IN_TURN);
+    expect(cl.map((c) => c.kind)).toEqual(['quad']);
+    expect(cl[0].mandatory).toBe(true);
+  });
+
+  it('khạp 3 Xe + Mã rác, ăn Pháo cùng màu → KHÔNG được ăn liền (xé khạp)', () => {
+    const hand = [t(Chariot, Red), t(Chariot, Red), t(Chariot, Red), t(Horse, Red)];
+    // liền Xe-Pháo-Mã cần rút 1 Xe khỏi khạp → cấm
+    expect(legalClaims(hand, t(Cannon, Red), IN_TURN)).toEqual([]);
+  });
+});
+
+describe('legalClaims — liền không được xé (§5.1)', () => {
+  it('liền T-S-Tượng trên tay, lật Tướng → KHÔNG được xé Sỹ+Tượng để ăn', () => {
+    const hand = [t(General, Red), t(Advisor, Red), t(Elephant, Red)];
+    expect(legalClaims(hand, t(General, Red), IN_TURN)).toEqual([]);
+  });
+
+  it('liền Xe-Pháo-Mã trên tay, ăn Xe/Pháo/Mã → không có nước nào', () => {
+    const hand = [t(Chariot, Red), t(Cannon, Red), t(Horse, Red)];
+    expect(legalClaims(hand, t(Chariot, Red), IN_TURN)).toEqual([]);
+    expect(legalClaims(hand, t(Cannon, Red), IN_TURN)).toEqual([]);
+  });
+
+  it('liền 3 Tốt khác màu: CHỈ ăn được màu còn lại (dùng trọn thành liền 4)', () => {
+    const hand = [t(Soldier, Red), t(Soldier, Yellow), t(Soldier, Green)];
+    // màu còn lại (trắng) → liền 4, dùng trọn bộ
+    const cl = legalClaims(hand, t(Soldier, White), IN_TURN);
+    expect(cl).toHaveLength(1);
+    expect(cl[0].kind).toBe('lien');
+    expect(cl[0].tiles).toHaveLength(4);
+    // màu đã có trong liền → không được ăn
+    expect(legalClaims(hand, t(Soldier, Red), IN_TURN)).toEqual([]);
+  });
+
+  it('bụng XXPM vẫn ăn được (liền chưa chốt vì có lá đôi chồng)', () => {
+    const hand = [t(Chariot, Red), t(Chariot, Red), t(Cannon, Red), t(Horse, Red)];
+    const cl = legalClaims(hand, t(Chariot, Red), IN_TURN);
+    expect(cl.some((c) => c.kind === 'pair')).toBe(true);
+    expect(cl.some((c) => c.kind === 'lien')).toBe(true);
+  });
+
+  it('T + 2 Sỹ + Tượng (liền + Sỹ dư): đôi Sỹ vẫn giật được (dùng trọn đôi)', () => {
+    const hand = [t(General, Red), t(Advisor, Red), t(Advisor, Red), t(Elephant, Red)];
+    const cl = legalClaims(hand, t(Advisor, Red), OUT_TURN);
+    expect(cl.some((c) => c.kind === 'triple')).toBe(true);
+  });
+});
+
+describe('legalClaims — anti-rác tuyệt đối (ăn không được TĂNG rác)', () => {
+  it('Tướng + đôi Sỹ, lật Tượng → không được xé Tướng+Sỹ để ăn liền', () => {
+    // hiện trạng 0 rác (Tướng lẻ + đôi Sỹ); ăn liền để lại 1 Sỹ rác → cấm
+    const hand = [t(General, Red), t(Advisor, Red), t(Advisor, Red)];
+    expect(legalClaims(hand, t(Elephant, Red), IN_TURN)).toEqual([]);
+  });
+
+  it('Tướng + đôi Tượng, lật Sỹ → tương tự, không được xé', () => {
+    const hand = [t(General, Yellow), t(Elephant, Yellow), t(Elephant, Yellow)];
+    expect(legalClaims(hand, t(Advisor, Yellow), IN_TURN)).toEqual([]);
+  });
+
+  it('Tướng + 1 Sỹ rác, lật Tượng → ĐƯỢC ăn liền (giảm rác)', () => {
+    const hand = [t(General, Red), t(Advisor, Red)];
+    const cl = legalClaims(hand, t(Elephant, Red), IN_TURN);
+    expect(cl.map((c) => c.kind)).toEqual(['lien']);
+  });
+});
+
 describe('legalClaims — anti-rác (§5, để lại ít rác nhất)', () => {
   it('2 Xe + Pháo + Mã, ăn Xe: KHÔNG được đôi Xe (khạp làm thừa rác)', () => {
     const hand = [t(Chariot, Red), t(Chariot, Red), t(Cannon, Red), t(Horse, Red)];

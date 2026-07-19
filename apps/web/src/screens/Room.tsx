@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { tryLockLandscape, unlockOrientation } from '../lib/orientation';
 import { mySeat, selectionValid, useGame } from '../store/game';
 import { PlayingCard } from '../components/PlayingCard';
 import { PlayedPile, type PilePosition } from '../components/PlayedPile';
@@ -61,6 +62,12 @@ export function Room() {
     leave,
     dismissResult,
   } = useGame.getState();
+
+  // Mobile: cố gắng khoá màn hình ngang khi ở trong bàn
+  useEffect(() => {
+    tryLockLandscape();
+    return unlockOrientation;
+  }, []);
 
   const seat = mySeat(room);
   const playing = room.status === 'playing';
@@ -201,6 +208,12 @@ export function Room() {
       </div>
 
       <Chat />
+
+      {/* Mobile cầm dọc: nhắc xoay ngang */}
+      <div className="rotate-hint">
+        <span className="rotate-hint__icon">📱↻</span>
+        Xoay ngang màn hình để chơi
+      </div>
 
       {result && (
         <ResultOverlay
